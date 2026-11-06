@@ -20,9 +20,12 @@ USER node
 # N8N_LISTEN_ADDRESS: n8n defaults to "::" (IPv6); hosts such as Render only route to 0.0.0.0.
 # N8N_RUNNERS_GRANT_TOKEN_TTL (seconds, default 30): on 0.1 CPU the JS task runner (it runs the
 # HMAC Code nodes) can take longer than 30 s to start and is then rejected with "invalid or expired grant token".
+# N8N_DISABLED_MODULES: optional n8n 2.x modules LendLoop doesn't use (AI agents, chat hub, MCP, SSO/LDAP,
+# source control, insights, …). Fewer modules = less memory on Render Free's 512 MB.
 ENV N8N_PORT=5678 \
     N8N_LISTEN_ADDRESS=0.0.0.0 \
     N8N_RUNNERS_GRANT_TOKEN_TTL=120 \
+    N8N_DISABLED_MODULES=insights,external-secrets,community-packages,data-table,oauth-server,mcp,mcp-discovery,provisioning,breaking-changes,source-control,dynamic-credentials,chat-hub,sso-oidc,sso-saml,log-streaming,ldap,quick-connect,workflow-builder,favorites,otel,token-exchange,mcp-registry,workflow-reviews,inbox,skills,instance-ai,knowledge,agents,agent-evals,scim \
     GENERIC_TIMEZONE=UTC \
     TZ=UTC \
     NODE_FUNCTION_ALLOW_BUILTIN=crypto \

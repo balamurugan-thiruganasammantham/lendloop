@@ -32,9 +32,9 @@ else
 fi
 
 # Render Free has 512 MB of RAM. Uncapped, n8n settles around 560 MB and gets
-# killed; capping the V8 heaps keeps it near 430 MB (peak ~480 MB). Only the
+# stopped; capped heaps + disabled modules (see Dockerfile) keep it well below. Only the
 # long-running server is capped: the one-off import above needs more headroom.
-export N8N_RUNNERS_MAX_OLD_SPACE_SIZE="${N8N_RUNNERS_MAX_OLD_SPACE_SIZE:-96}"
-export NODE_OPTIONS="--max-old-space-size=${LENDLOOP_N8N_HEAP_MB:-256}"
+export N8N_RUNNERS_MAX_OLD_SPACE_SIZE="${N8N_RUNNERS_MAX_OLD_SPACE_SIZE:-64}"
+export NODE_OPTIONS="--max-old-space-size=${LENDLOOP_N8N_HEAP_MB:-256} --max-semi-space-size=4"
 
 exec /docker-entrypoint.sh "$@"
