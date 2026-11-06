@@ -10,6 +10,25 @@ LendLoop is a map-first, neighbourhood tool library. People list tools they rare
 | --- | --- | --- |
 | ![Mobile](docs/screenshots/explore-mobile.png) | ![Request](docs/screenshots/request-modal.png) | ![Profile](docs/screenshots/profile.png) |
 
+## Live deployment
+
+| Piece | URL | Hosting (free tier) |
+| --- | --- | --- |
+| Website | **https://lendloopapp.vercel.app** | Vercel Hobby |
+| Backend | `https://acrobatic-alpaca-862.eu-west-1.convex.cloud` (health: [`/health`](https://acrobatic-alpaca-862.eu-west-1.convex.site/health)) | Convex Free, production deployment |
+| Automation | https://looplend-n8n.onrender.com | n8n on Render Free + Render Postgres |
+| Sign-in | Clerk development instance | Clerk Hobby |
+| CI/CD | GitHub Actions: [`ci.yml`](.github/workflows/ci.yml), [`deploy.yml`](.github/workflows/deploy.yml) | every push to `main` deploys Convex → Vercel → (n8n) → smoke test |
+
+**Documentation**
+
+| Document | What it covers |
+| --- | --- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The system in depth: topology, how a request is authenticated, **a sequence diagram and step list for every operation** (sign-in, discovery, listings, requests, loan state machine, OTP hand-overs, reviews, notifications, n8n workflows, crons, admin), data model, every function and route, security, configuration, CI/CD |
+| [`docs/PRODUCTION.md`](docs/PRODUCTION.md) | Operating the live deployment: what's live, what to click in each dashboard (Google sign-in, Clerk, Mapbox, rotating keys), free-tier limits, moving n8n's database before it expires, going fully production with a domain |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Deploying from scratch on free tiers (Vercel, Convex, Render/Oracle for n8n), and why Render Free can't send SMTP |
+| [`docs/CONVEX_SETUP.md`](docs/CONVEX_SETUP.md) · [`docs/N8N_SETUP.md`](docs/N8N_SETUP.md) | Backend and automation setup for local development |
+
 ---
 
 ## Contents

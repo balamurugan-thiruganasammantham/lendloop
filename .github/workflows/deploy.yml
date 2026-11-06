@@ -9,6 +9,10 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Documentation-only changes don't redeploy anything.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   workflow_dispatch:
     inputs:
       deploy_n8n:
