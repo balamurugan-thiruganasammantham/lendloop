@@ -142,6 +142,21 @@ These values were shared in plain text during setup. Replace them, then update t
 | Change a production env var | Convex: `npx convex env set --prod NAME value`; Vercel: project → Settings → Environment Variables (then redeploy); Render: service → Environment | Convex applies instantly; Vercel needs a new deploy; Render redeploys |
 | Remove the sample data | `npx convex env set --prod SEED_ENABLED true && npx convex run --prod seed:reset && npx convex env remove --prod SEED_ENABLED` | All "Sample" members, tools, loans and photos removed; real data untouched |
 
+### Reading the n8n logs on Render
+
+| Log line | Meaning | Action |
+| --- | --- | --- |
+| `Importing LendLoop workflows (<hash>)…` then `Publishing workflow …` ×3 | The workflow files changed (or the database is new): one-time import, ~4–5 min on 0.1 CPU | Wait |
+| `No open ports detected, continuing to scan...` | Render waiting while that import runs | Wait (it continues scanning) |
+| `LendLoop workflows unchanged (<hash>): skipping import.` | Normal restart / wake-up | — |
+| `n8n ready on 0.0.0.0, port 5678` → `Your service is live 🎉` | Up | — |
+| `Task runner … invalid or expired grant token` / `[runner:js] … 403` | The code runner started slower than its token lifetime; it retries. The image sets `N8N_RUNNERS_GRANT_TOKEN_TTL=120` to avoid it | Only act if it repeats forever: raise the value in Render → Environment |
+| `Failed to start Python task runner …` | No Python in the image; LendLoop only uses JavaScript Code nodes | Ignore |
+| `There are deprecations…`, `DeprecationWarning: Calling client.query()…` | Informational | Ignore |
+| `Postgres 16 is outside the supported range…` | Works ("compatibility support"); Neon (section 4) uses PostgreSQL 17 | Fixed by the move in section 4 |
+| `Database ping failed (1/3)` once | A slow ping while the CPU is busy; it recovers | Ignore unless it reaches 3/3 |
+| `Port scan timeout reached` followed by restarts | n8n never opened its port | Check `N8N_LISTEN_ADDRESS=0.0.0.0` and the database variables |
+
 ---
 
 ## 6. Later: going fully production with your own domain

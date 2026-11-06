@@ -18,8 +18,11 @@ USER node
 
 # Non-secret defaults (same as docker-compose.yml). Override on the host if needed.
 # N8N_LISTEN_ADDRESS: n8n defaults to "::" (IPv6); hosts such as Render only route to 0.0.0.0.
+# N8N_RUNNERS_GRANT_TOKEN_TTL (seconds, default 30): on 0.1 CPU the JS task runner (it runs the
+# HMAC Code nodes) can take longer than 30 s to start and is then rejected with "invalid or expired grant token".
 ENV N8N_PORT=5678 \
     N8N_LISTEN_ADDRESS=0.0.0.0 \
+    N8N_RUNNERS_GRANT_TOKEN_TTL=120 \
     GENERIC_TIMEZONE=UTC \
     TZ=UTC \
     NODE_FUNCTION_ALLOW_BUILTIN=crypto \
