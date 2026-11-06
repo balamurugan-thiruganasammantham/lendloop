@@ -139,7 +139,7 @@ jobs:
           N8N_URL: ${{ vars.N8N_URL }}
         run: |
           set -euo pipefail
-          check() { # url, expected text, attempts (n8n on Render Free may need ~1 min to wake up)
+          check() { # url, expected text, attempts (n8n on Render Free may need minutes: wake-up, plus one restart right after a deploy)
             for i in $(seq 1 "$3"); do
               if curl -fsSL --max-time 30 "$1" | grep -q "$2"; then echo "OK  $1"; return 0; fi
               sleep 10
@@ -148,4 +148,4 @@ jobs:
           }
           check "$APP_URL/" "LendLoop" 6
           check "$CONVEX_SITE_URL/health" '"ok":true' 6
-          check "$N8N_URL/healthz" "ok" 12
+          check "$N8N_URL/healthz" "ok" 30
