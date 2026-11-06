@@ -91,6 +91,8 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Dev only: the Next.js badge defaults to bottom-left, on top of the app rail's account button.
+  devIndicators: { position: "bottom-right" },
   sassOptions: {
     loadPaths: [path.join(process.cwd(), "src/styles")],
   },

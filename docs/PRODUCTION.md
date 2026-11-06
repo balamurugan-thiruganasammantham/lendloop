@@ -25,7 +25,7 @@ Values marked *(secret)* are not in this repository. Your copy of every value is
 | Area | Live now | Needs a domain you own |
 | --- | --- | --- |
 | Website, backend, automation, CI/CD | ✅ Production deployments | — |
-| Sign-in | ✅ Works for everyone, on Clerk's **development** keys | Clerk production instance (no "Development mode" badge, no 100-user cap) |
+| Sign-in | ✅ Works for everyone, on Clerk's **development** keys (the "Development mode" label is hidden with Clerk's `unsafe_disableDevelopmentModeWarnings` appearance option) | Clerk production instance (no 100-user cap) |
 | Google sign-in | ✅ Works; Google's screen says "accounts.dev" | Your own app name + logo on Google's screen |
 | Hand-over code emails | ✅ Sent by Convex through Resend, **but only to your Resend account email** | Emails to every user |
 | n8n notification emails | Recorded, not emailed (Render Free blocks SMTP) | — (needs a paid host or Oracle VM, not a domain) |
@@ -104,7 +104,7 @@ These values were shared in plain text during setup. Replace them, then update t
 
 | Service | Limit | What happens / what to do |
 | --- | --- | --- |
-| Clerk development instance | Max **100 users**; "Development mode" badge | Fine for a demo. Section 6 for production. |
+| Clerk development instance | Max **100 users** (the "Development mode" label is hidden in the UI, but the instance is still a development one) | Fine for a demo. Section 6 for production. |
 | Resend without a domain | Sends only **to your Resend account email**, from `onboarding@resend.dev`; 100 emails/day | Other users don't get code emails; they press **Show pickup code** on the loan page instead. |
 | Render Free (n8n) | Sleeps after **15 min** idle (~1 min to wake); **SMTP blocked**; 750 h/month | Convex retries webhooks (≈30 s, 2 min, 10 min, 30 min, 2 h), so nothing is lost. n8n email mode stays `mock`. The 09:00 UTC overdue run only fires if n8n is awake. |
 | Render Free Postgres | **Deleted after 30 days** (expires **2026-12-06**, 14-day grace) | Before then, follow section 4. |

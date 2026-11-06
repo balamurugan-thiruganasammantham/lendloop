@@ -70,7 +70,7 @@ export function FiltersPanel({
         </label>
         <label className={styles.check}>
           <input type="checkbox" checked={value.availableNowOnly} onChange={(e) => set("availableNowOnly", e.target.checked)} />
-          Hide tools with upcoming reservations
+          Available now only (hide tools with upcoming bookings)
         </label>
       </fieldset>
 

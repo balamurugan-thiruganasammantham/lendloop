@@ -2,14 +2,15 @@
 
 import clsx from "clsx";
 import { useQuery } from "convex/react";
-import { ChevronRight, Compass, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ArrowLeft, ChevronRight, Compass, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { MAX_DISCOVERY_RADIUS_KM, type ToolCategory } from "@convex/lib/constants";
+import { CATEGORY_LABELS, type ToolCategory } from "@convex/lib/constants";
+import { formatDistance, haversineKm } from "@convex/lib/geo";
 import { Logo } from "@/components/brand/Logo";
 import { BottomSheet, type SheetSnap } from "@/components/common/BottomSheet";
 import { Button, IconButton } from "@/components/common/Button";
@@ -23,6 +24,7 @@ import { MOBILE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { plural } from "@/lib/format";
 import { sortByDistance, withLiveDistances } from "@/lib/location";
 import { CategoryChips } from "./CategoryChips";
+import { CategoryGrid } from "./CategoryGrid";
 import { ExploreSearch } from "./ExploreSearch";
 import { activeFilterCount, DEFAULT_FILTERS, type DiscoveryFilters } from "./filters";
 import { LocationBanner } from "./LocationCta";
@@ -70,9 +72,12 @@ export function ExploreView() {
     setSelectedId(selectedParam);
   }
 
+  // One filter state for the category chips, the "Available now" chip and the Filters dialog.
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
-  const [category, setCategory] = useState<ToolCategory | "ALL">("ALL");
-  const [availableOnly, setAvailableOnly] = useState(false);
+  const category = filters.category;
+  const availableOnly = filters.availableNowOnly;
+  const setCategory = useCallback((c: ToolCategory | "ALL") => setFilters((f) => ({ ...f, category: c })), []);
+  const setAvailableOnly = useCallback((v: boolean) => setFilters((f) => ({ ...f, availableNowOnly: v })), []);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [requestOpen, setRequestOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -112,7 +117,6 @@ export function ExploreView() {
     radiusKm: radius,
     conditions: filters.conditions.length ? filters.conditions : undefined,
     trustedOnly: filters.trustedOnly || undefined,
-    availableNowOnly: filters.availableNowOnly || undefined,
     search: search.length >= 2 ? search : undefined,
     sort,
   });
@@ -129,7 +133,10 @@ export function ExploreView() {
     return c;
   }, [all]);
   const availableCount = all.filter((i) => i.status !== "RESERVED").length;
-  const items = all.filter((i) => (category === "ALL" || i.category === category) && (!availableOnly || i.status !== "RESERVED"));
+  // Availability applies to everything (category cards included); the category narrows the tool list.
+  const visible = availableOnly ? all.filter((i) => i.status !== "RESERVED") : all;
+  const items = category === "ALL" ? visible : visible.filter((i) => i.category === category);
+  const showCategoryIndex = category === "ALL" && !search;
 
   const selectTool = useCallback(
     (id: string | null) => {
@@ -165,7 +172,7 @@ export function ExploreView() {
           </IconButton>
         )}
       </div>
-      <h1 className={clsx(styles.title, "display")}>{search ? `“${search}”` : title}</h1>
+      <h1 className={clsx(styles.title, "display")}>{search ? `“${search}”` : category !== "ALL" ? CATEGORY_LABELS[category] : title}</h1>
       <p className={styles.stats}>
         {result === undefined ? (
           "Finding tools…"
@@ -201,10 +208,26 @@ export function ExploreView() {
 
   const list = (
     <div className={styles.listWrap}>
+      {showCategoryIndex && !availableOnly && result !== undefined && (
+        <CategoryGrid
+          items={visible}
+          onPick={(c) => {
+            setCategory(c);
+            listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
       <div className={styles.sectionHead}>
-        <span className={styles.eyebrow}>
-          <span className="num">{items.length}</span> {items.length === 1 ? "tool" : "tools"}
-        </span>
+        {category !== "ALL" ? (
+          <button type="button" className={styles.backLink} onClick={() => setCategory("ALL")}>
+            <ArrowLeft aria-hidden /> All categories
+          </button>
+        ) : (
+          <span className={styles.eyebrow}>
+            {showCategoryIndex ? "All tools · " : ""}
+            <span className="num">{items.length}</span> {items.length === 1 ? "tool" : "tools"}
+          </span>
+        )}
         <label className={styles.sort}>
           Sort:
           <select
@@ -231,23 +254,17 @@ export function ExploreView() {
         <EmptyState
           compact
           icon={<Compass />}
-          title={search ? "No tools match your search" : radius ? `No tools within ${radius} km` : "No tools found"}
+          title={search ? "No tools match your search" : radius ? `No tools within ${radius} km of you` : "No tools found"}
           description={
-            result.suggestion ? `The nearest listings are around ${result.suggestion.label}.` : "Try removing some filters, or list a tool yourself."
+            result.suggestion
+              ? `The closest listings are around ${result.suggestion.label}${point ? ` (${formatDistance(haversineKm(point, result.suggestion))} away)` : ""}.`
+              : "Try removing some filters, or list a tool yourself."
           }
           action={
             <>
-              {radius !== undefined && radius < MAX_DISCOVERY_RADIUS_KM && (
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    setFilters({
-                      ...filters,
-                      radiusKm: MAX_DISCOVERY_RADIUS_KM,
-                    })
-                  }
-                >
-                  Expand to {MAX_DISCOVERY_RADIUS_KM} km
+              {radius !== undefined && (
+                <Button size="sm" onClick={() => setFilters({ ...filters, radiusKm: "ANY" })}>
+                  Show all distances
                 </Button>
               )}
               {result.suggestion && (
@@ -264,7 +281,7 @@ export function ExploreView() {
                     )
                   }
                 >
-                  Browse {result.suggestion.label.split(",")[0]}
+                  Show tools around {result.suggestion.label.split(",")[0]}
                 </Button>
               )}
             </>

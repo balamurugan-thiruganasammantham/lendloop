@@ -1,5 +1,10 @@
 /** Clerk components themed to the LendLoop design tokens. */
 export const clerkAppearance = {
+  options: {
+    // The deployed app uses Clerk's development instance (a production instance needs an owned
+    // domain). This only hides the "Development mode" label; the dev-instance limits still apply.
+    unsafe_disableDevelopmentModeWarnings: true,
+  },
   variables: {
     colorPrimary: "#1f1b16",
     colorPrimaryForeground: "#ffffff",

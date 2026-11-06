@@ -65,7 +65,23 @@ export default function ExploreMap(props: ExploreMapProps) {
     [tools],
   );
   const selected = pins.find((p) => p.id === selectedId) ?? null;
-  const points = useMemo(() => (me ? [] : pins.map((p) => [p.lat, p.lng] as [number, number])), [me, pins]);
+  // Nothing nearby (e.g. you're in Puducherry and the tools are in Bengaluru): frame you together
+  // with the closest tools instead of zooming into an empty map around you.
+  const NEARBY_KM = 25;
+  const far = useMemo(() => {
+    if (!me || tools.length === 0) return false;
+    return !tools.some((t) => t.distanceKm !== null && t.distanceKm <= NEARBY_KM);
+  }, [me, tools]);
+  const points = useMemo(() => {
+    if (!me) return pins.map((p) => [p.lat, p.lng] as [number, number]);
+    if (!far) return [];
+    const nearest = [...tools]
+      .filter((t) => t.distanceKm !== null)
+      .sort((a, b) => a.distanceKm! - b.distanceKm!)
+      .slice(0, 3)
+      .map((t) => [t.approxLat, t.approxLng] as [number, number]);
+    return [[me.point.lat, me.point.lng] as [number, number], ...nearest];
+  }, [me, far, pins, tools]);
   const start: [number, number] = me ? [me.point.lng, me.point.lat] : [SEED_NEIGHBORHOOD.lng, SEED_NEIGHBORHOOD.lat];
   const padding = useMemo(() => ({ bottom: bottomInset }), [bottomInset]);
   // Fly to the viewer on the first fix, a newly picked place or a "locate" press, not on every live GPS update.
@@ -92,8 +108,12 @@ export default function ExploreMap(props: ExploreMapProps) {
           label={me.source === "manual" ? (me.label?.split(",")[0] ?? null) : null}
         />
       )}
-      {me && meKey && <FlyTo target={{ lat: me.point.lat, lng: me.point.lng, key: meKey }} zoom={13.6} padding={padding} />}
-      <FitPoints points={points} signature={String(points.length)} padding={{ top: 80, bottom: bottomInset + 40, left: 60, right: 60 }} />
+      {me && meKey && !far && <FlyTo target={{ lat: me.point.lat, lng: me.point.lng, key: meKey }} zoom={13.6} padding={padding} />}
+      <FitPoints
+        points={points}
+        signature={`${far ? `far:${meKey}` : "all"}:${points.length}`}
+        padding={{ top: 80, bottom: bottomInset + 40, left: 60, right: 60 }}
+      />
       <ToolPins items={pins} selectedId={selectedId} hoveredId={hoveredId} onSelect={onSelect} onHover={onHover} />
       <FlyTo target={selected ? { lat: selected.lat, lng: selected.lng, key: selected.id } : null} zoom={15.2} padding={padding} />
     </MapView>

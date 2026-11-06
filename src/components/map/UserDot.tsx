@@ -7,11 +7,12 @@ import styles from "./UserDot.module.scss";
 /**
  * The viewer's own position: GPS = pulsing blue dot labelled "Your location",
  * a manually chosen place = neutral dot labelled with the place.
+ * Drawn above tool pins and region/cluster bubbles (only hovered/selected pins go higher).
  */
 export function UserDot({ lat, lng, manual, label }: { lat: number; lng: number; manual: boolean; label?: string | null }) {
   const text = label ?? (manual ? "Selected place" : "Your location");
   return (
-    <MapMarker lat={lat} lng={lng} zIndex={12}>
+    <MapMarker lat={lat} lng={lng} zIndex={800}>
       <span className={styles.wrap} role="img" aria-label={text}>
         <span className={clsx(styles.dot, manual && styles.manual)} />
         <span className={clsx(styles.label, manual && styles.labelManual)}>{text}</span>

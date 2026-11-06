@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
@@ -7,7 +8,18 @@ import { searchPlaces, type PlaceResult } from "@/services/maps";
 import styles from "./PlaceSearch.module.scss";
 
 /** Neighbourhood/place search backed by the geocoding proxy. */
-export function PlaceSearch({ onPick, autoFocus, placeholder = "Search a neighbourhood or address" }: { onPick: (p: PlaceResult) => void; autoFocus?: boolean; placeholder?: string }) {
+/** `floating`: results overlay what's below (e.g. a map) instead of pushing the layout down. */
+export function PlaceSearch({
+  onPick,
+  autoFocus,
+  placeholder = "Search a neighbourhood or address",
+  floating,
+}: {
+  onPick: (p: PlaceResult) => void;
+  autoFocus?: boolean;
+  placeholder?: string;
+  floating?: boolean;
+}) {
   const [value, setValue] = useState("");
   const [debounced, setDebounced] = useState("");
   const listId = useId();
@@ -37,7 +49,7 @@ export function PlaceSearch({ onPick, autoFocus, placeholder = "Search a neighbo
         />
       </div>
       {debounced.length >= 3 && (
-        <ul id={listId} className={styles.results} role="listbox">
+        <ul id={listId} className={clsx(styles.results, floating && styles.floating)} role="listbox">
           {query.isLoading && <li className={styles.note}>Searching…</li>}
           {query.isError && <li className={styles.note}>Place search is unavailable right now. Try again shortly.</li>}
           {query.data?.length === 0 && <li className={styles.note}>No places found.</li>}

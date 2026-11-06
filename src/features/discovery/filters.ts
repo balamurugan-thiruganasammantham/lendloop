@@ -1,5 +1,4 @@
 import type { ToolCategory, ToolCondition } from "@convex/lib/constants";
-import { DEFAULT_DISCOVERY_RADIUS_KM } from "@convex/lib/constants";
 
 export type SortKey = "nearest" | "recent" | "rating";
 
@@ -12,9 +11,14 @@ export interface DiscoveryFilters {
   sort: SortKey;
 }
 
+/**
+ * One filter state shared by the category chips above the list and the Filters dialog.
+ * Distance defaults to "Any": everything is listed, nearest first, so people far from the
+ * existing listings still see them (with real distances) instead of an empty map.
+ */
 export const DEFAULT_FILTERS: DiscoveryFilters = {
   category: "ALL",
-  radiusKm: DEFAULT_DISCOVERY_RADIUS_KM,
+  radiusKm: "ANY",
   conditions: [],
   trustedOnly: false,
   availableNowOnly: false,

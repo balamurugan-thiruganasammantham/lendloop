@@ -63,6 +63,12 @@ interface LocationApi {
   setManual: (point: LatLng, label: string) => void;
   dismiss: () => void;
   reset: () => void;
+  /**
+   * One-off "where am I" for forms (onboarding "Detect", listing "Use my location").
+   * Uses the live GPS fix when there is a fresh one, otherwise asks the browser.
+   * Resolves null when location isn't available (the reason is shown to the user).
+   */
+  getPosition: () => Promise<{ point: LatLng; accuracy: number | null } | null>;
 }
 
 const LocationContext = createContext<LocationApi | null>(null);
@@ -338,6 +344,35 @@ export function LocationProvider({ children, sharingEnabled }: { children: React
     void locate(true);
   }, [locate, sharingEnabled, state.status]);
 
+  const getPosition = useCallback(async (): Promise<{ point: LatLng; accuracy: number | null } | null> => {
+    const fix = lastFix.current;
+    if (fix && Date.now() - fix.at < 2 * 60_000) return { point: fix.point, accuracy: fix.accuracy };
+    if (!("geolocation" in navigator)) {
+      setHelp("unavailable");
+      return null;
+    }
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          // Feed the map too, so the explicit request also turns live location on.
+          if (sharingEnabled !== false && readStored()?.choice !== "manual") {
+            wantGps.current = true;
+            writeStored({ choice: "gps" });
+            acceptFix(pos);
+            if (document.visibilityState === "visible") startWatch();
+          }
+          resolve({ point: { lat: pos.coords.latitude, lng: pos.coords.longitude }, accuracy: pos.coords.accuracy ?? null });
+        },
+        async (err) => {
+          if (err.code === err.PERMISSION_DENIED && (await permissionState()) === "denied") setHelp("blocked");
+          else if (err.code !== err.PERMISSION_DENIED) setHelp("unavailable");
+          resolve(null);
+        },
+        { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
+      );
+    });
+  }, [acceptFix, sharingEnabled, startWatch]);
+
   const api = useMemo<LocationApi>(
     () => ({
       state,
@@ -347,8 +382,9 @@ export function LocationProvider({ children, sharingEnabled }: { children: React
       setManual,
       dismiss,
       reset,
+      getPosition,
     }),
-    [state, live, requestGps, setManual, dismiss, reset],
+    [state, live, requestGps, setManual, dismiss, reset, getPosition],
   );
 
   const closeHelp = () => {

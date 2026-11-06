@@ -12,8 +12,9 @@
     display: block;
   }
 }
+/* Hidden panel: the map takes the whole width (a hidden grid item would leave the map in a 0-wide column). */
 .panelClosed {
-  grid-template-columns: 0 1fr;
+  grid-template-columns: 1fr;
   .panel {
     display: none;
   }
@@ -229,4 +230,25 @@
 }
 .sheetBody {
   background: var(--surface-2);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }

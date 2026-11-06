@@ -11,6 +11,7 @@ import { Button } from "@/components/common/Button";
 import { Field, Input, Textarea } from "@/components/common/Field";
 import { InlineAlert } from "@/components/common/States";
 import { useToast } from "@/components/common/Toast";
+import { useLocation } from "@/features/discovery/LocationProvider";
 import { errorMessage } from "@/lib/errors";
 import { profileSchema, type ProfileValues } from "@/lib/validation";
 import { reverseGeocode } from "@/services/maps";
@@ -21,6 +22,7 @@ export function ProfileForm({ onboarding, onDone }: { onboarding?: boolean; onDo
   const viewer = useViewer();
   const update = useMutation(api.users.updateProfile);
   const toast = useToast();
+  const location = useLocation();
   const [approx, setApprox] = useState<{ lat: number; lng: number } | null>(
     viewer.approxLat !== null && viewer.approxLng !== null ? { lat: viewer.approxLat, lng: viewer.approxLng } : null,
   );
@@ -37,26 +39,22 @@ export function ProfileForm({ onboarding, onDone }: { onboarding?: boolean; onDo
     defaultValues: { name: viewer.name, bio: viewer.bio, areaLabel: viewer.areaLabel, locationSharing: viewer.locationSharing },
   });
 
-  const useCurrentArea = () => {
-    if (!("geolocation" in navigator)) return;
+  const detectArea = async () => {
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        // Coarsened again on the server; only ~1 km precision is ever stored.
-        const p = { lat: Math.round(pos.coords.latitude * 100) / 100, lng: Math.round(pos.coords.longitude * 100) / 100 };
-        setApprox(p);
-        if (!getValues("areaLabel")) {
-          const label = await reverseGeocode(p).catch(() => null);
-          if (label) setValue("areaLabel", label.split(",").slice(0, 2).join(",").trim(), { shouldDirty: true });
-        }
-        setLocating(false);
-      },
-      () => {
-        setLocating(false);
-        toast.error("Couldn't get your location. You can type your neighbourhood instead.");
-      },
-      { timeout: 12_000 },
-    );
+    // Shared with the map: reuses a live fix, and explains how to unblock location if the browser blocked it.
+    const pos = await location.getPosition();
+    if (!pos) {
+      setLocating(false);
+      toast.error("Couldn't get your location. You can type your neighbourhood instead.");
+      return;
+    }
+    // Coarsened again on the server; only ~1 km precision is ever stored.
+    const p = { lat: Math.round(pos.point.lat * 100) / 100, lng: Math.round(pos.point.lng * 100) / 100 };
+    setApprox(p);
+    const label = await reverseGeocode(p).catch(() => null);
+    if (label) setValue("areaLabel", label.split(",").slice(0, 2).join(",").trim(), { shouldDirty: true });
+    else toast.info("Location found, but we couldn't name the area. Type your neighbourhood.");
+    setLocating(false);
   };
 
   const onSubmit = handleSubmit(async (v) => {
@@ -86,7 +84,7 @@ export function ProfileForm({ onboarding, onDone }: { onboarding?: boolean; onDo
         {(id, d) => (
           <div className={styles.inline}>
             <Input id={id} aria-describedby={d} maxLength={LIMITS.areaMax} {...register("areaLabel")} />
-            <Button icon={<LocateFixed />} onClick={useCurrentArea} loading={locating}>
+            <Button icon={<LocateFixed />} onClick={() => void detectArea()} loading={locating}>
               Detect
             </Button>
           </div>

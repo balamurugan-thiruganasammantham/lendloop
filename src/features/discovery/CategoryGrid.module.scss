@@ -1,0 +1,135 @@
+@use "mixins" as *;
+
+.section {
+  padding: 4px 20px 8px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.eyebrow {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Photo card, like a region index: image, dark gradient, big serif name, round arrow. */
+.card {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 148px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  text-align: left;
+  color: #fff;
+  background: #2a2520;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  isolation: isolate;
+  transition:
+    transform 180ms var(--ease),
+    box-shadow 180ms var(--ease);
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+  &:hover .image {
+    transform: scale(1.04);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+}
+.image,
+.placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.image {
+  object-fit: cover;
+  transition: transform 600ms var(--ease);
+  z-index: -2;
+}
+.placeholder {
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 70% 30%, #5b5146, #2a2520);
+  z-index: -2;
+  svg {
+    width: 64px;
+    height: 64px;
+    opacity: 0.35;
+  }
+}
+.shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgb(20 16 12 / 0.15) 0%, rgb(20 16 12 / 0.25) 40%, rgb(20 16 12 / 0.78) 100%);
+}
+.kicker {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.85);
+}
+.text {
+  position: absolute;
+  left: 16px;
+  right: 64px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.name {
+  font-size: 25px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.25);
+}
+.meta {
+  font-size: 13px;
+  color: rgb(255 255 255 / 0.88);
+}
+.arrow {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.2);
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+}

@@ -84,20 +84,16 @@ export function ToolForm({ initial }: { initial?: ToolFormInitial }) {
     }
   };
 
-  const useCurrent = () => {
-    if (!("geolocation" in navigator)) return;
+  const locateMe = async () => {
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false);
-        void setPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      () => {
-        setLocating(false);
-        toast.error("Couldn't get your location. Click on the map to place the pickup point instead.");
-      },
-      { enableHighAccuracy: true, timeout: 12_000 },
-    );
+    // Shared with the map: reuses a live fix, and explains how to unblock location if the browser blocked it.
+    const pos = await location.getPosition();
+    setLocating(false);
+    if (!pos) {
+      toast.error("Couldn't get your location. Search for your street or click the map to place the pickup point.");
+      return;
+    }
+    void setPoint(pos.point);
   };
 
   const onSubmit = handleSubmit(async (v) => {
@@ -141,7 +137,16 @@ export function ToolForm({ initial }: { initial?: ToolFormInitial }) {
       <section className={styles.section}>
         <h2>The tool</h2>
         <Field label="Name" error={errors.name?.message}>
-          {(id, d) => <Input id={id} aria-describedby={d} placeholder="e.g. Cordless drill (18V)" maxLength={LIMITS.toolNameMax} invalid={!!errors.name} {...register("name")} />}
+          {(id, d) => (
+            <Input
+              id={id}
+              aria-describedby={d}
+              placeholder="e.g. Cordless drill (18V)"
+              maxLength={LIMITS.toolNameMax}
+              invalid={!!errors.name}
+              {...register("name")}
+            />
+          )}
         </Field>
         <div className={styles.row}>
           <Field label="Category" error={errors.category?.message}>
@@ -168,7 +173,9 @@ export function ToolForm({ initial }: { initial?: ToolFormInitial }) {
           </Field>
         </div>
         <Field label="Description" hint="What's included, quirks, what it's good for." error={errors.description?.message}>
-          {(id, d) => <Textarea id={id} aria-describedby={d} rows={4} maxLength={LIMITS.descriptionMax} invalid={!!errors.description} {...register("description")} />}
+          {(id, d) => (
+            <Textarea id={id} aria-describedby={d} rows={4} maxLength={LIMITS.descriptionMax} invalid={!!errors.description} {...register("description")} />
+          )}
         </Field>
         <div className={styles.field}>
           <span className={styles.label}>Photos</span>
@@ -192,9 +199,9 @@ export function ToolForm({ initial }: { initial?: ToolFormInitial }) {
         </p>
         <div className={styles.pickerTools}>
           <div className={styles.placeSearch}>
-            <PlaceSearch placeholder="Search your street or building" onPick={(p) => void setPoint({ lat: p.lat, lng: p.lng }, p.label)} />
+            <PlaceSearch floating placeholder="Search your street or building" onPick={(p) => void setPoint({ lat: p.lat, lng: p.lng }, p.label)} />
           </div>
-          <Button icon={<LocateFixed />} onClick={useCurrent} loading={locating}>
+          <Button icon={<LocateFixed />} onClick={() => void locateMe()} loading={locating}>
             Use my location
           </Button>
         </div>
@@ -219,7 +226,15 @@ export function ToolForm({ initial }: { initial?: ToolFormInitial }) {
         <div className={styles.row3}>
           <Field label="Max loan (days)" error={errors.maxLoanDays?.message}>
             {(id, d) => (
-              <Input id={id} aria-describedby={d} type="number" min={1} max={LIMITS.maxLoanDaysCeiling} invalid={!!errors.maxLoanDays} {...register("maxLoanDays", { valueAsNumber: true })} />
+              <Input
+                id={id}
+                aria-describedby={d}
+                type="number"
+                min={1}
+                max={LIMITS.maxLoanDaysCeiling}
+                invalid={!!errors.maxLoanDays}
+                {...register("maxLoanDays", { valueAsNumber: true })}
+              />
             )}
           </Field>
           <Field label="Available from" optional error={errors.availableFrom?.message}>
