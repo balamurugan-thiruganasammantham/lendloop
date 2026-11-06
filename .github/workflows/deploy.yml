@@ -1,0 +1,147 @@
+# Continuous delivery for main:
+#   1. the CI checks (ci.yml)
+#   2. Convex backend   → production deployment (CONVEX_DEPLOY_KEY)
+#   3. Next.js website  → Vercel production (built here, uploaded with --prebuilt)
+#   4. n8n automation   → Render (redeployed only when n8n/ changed, or on manual request)
+#   5. smoke tests against the live URLs
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_n8n:
+        description: Redeploy n8n on Render even if n8n/ did not change
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  convex:
+    name: Deploy Convex backend
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: npx convex deploy
+        run: npx convex deploy -y
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+  web:
+    name: Deploy website to Vercel
+    needs: convex
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Pull Vercel production settings and env vars
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy to production
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "Deployed: $url (production alias ${{ vars.APP_URL }})" >> "$GITHUB_STEP_SUMMARY"
+
+  n8n:
+    name: Deploy n8n to Render
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Did n8n/ change?
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.deploy_n8n }}" = "true" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --quiet "$before" "${{ github.sha }}" -- n8n/; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"; echo "n8n/ unchanged: skipping Render deploy" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Trigger Render deploy and wait until live
+        if: steps.changes.outputs.deploy == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE: ${{ vars.RENDER_SERVICE_ID }}
+        run: |
+          set -euo pipefail
+          api=https://api.render.com/v1
+          id=$(curl -fsS -X POST "$api/services/$SERVICE/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" -H "Content-Type: application/json" \
+            -d "{\"commitId\":\"${{ github.sha }}\"}" | jq -r .id)
+          echo "Render deploy $id started"
+          for i in $(seq 1 80); do
+            status=$(curl -fsS "$api/services/$SERVICE/deploys/$id" -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" | jq -r .status)
+            echo "status: $status"
+            case "$status" in
+              live) echo "n8n deploy $id is live" >> "$GITHUB_STEP_SUMMARY"; exit 0 ;;
+              build_failed|update_failed|canceled|deactivated|pre_deploy_failed) echo "Render deploy failed: $status"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for Render"; exit 1
+
+  smoke:
+    name: Smoke test production
+    needs: [web, n8n]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Website, Convex and n8n respond
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CONVEX_SITE_URL: ${{ vars.CONVEX_SITE_URL }}
+          N8N_URL: ${{ vars.N8N_URL }}
+        run: |
+          set -euo pipefail
+          check() { # url, expected text, attempts (n8n on Render Free may need ~1 min to wake up)
+            for i in $(seq 1 "$3"); do
+              if curl -fsSL --max-time 30 "$1" | grep -q "$2"; then echo "OK  $1"; return 0; fi
+              sleep 10
+            done
+            echo "FAIL $1"; return 1
+          }
+          check "$APP_URL/" "LendLoop" 6
+          check "$CONVEX_SITE_URL/health" '"ok":true' 6
+          check "$N8N_URL/healthz" "ok" 12

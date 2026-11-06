@@ -6,7 +6,8 @@
 #
 # Secrets (N8N_ENCRYPTION_KEY, LENDLOOP_*) and the database settings come from the host's
 # environment variables. See docs/DEPLOY.md.
-FROM docker.n8n.io/n8nio/n8n:2.46.6
+# Docker Hub mirror of the official image (docker.n8n.io rate-limits shared build hosts such as Render).
+FROM docker.io/n8nio/n8n:2.46.6
 
 USER root
 COPY workflows /workflows
