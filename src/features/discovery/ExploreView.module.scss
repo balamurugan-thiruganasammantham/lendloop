@@ -166,11 +166,21 @@
   height: 100%;
   background: var(--map-bg);
 }
-.showPanel {
+/* Shown when the panel is hidden: reopen button + Map/List toggle (top-left, like startupmap). */
+.floatingControls {
   position: absolute;
   top: 16px;
   left: 16px;
   z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  > div {
+    box-shadow: var(--shadow-card);
+    background: var(--surface);
+  }
+}
+.showPanel {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -251,4 +261,104 @@
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- List view (cards grid instead of the map) ---------- */
+.listArea {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 28px 40px;
+  background: var(--bg, #f4f1ea);
+  .floatingControls {
+    position: static;
+    margin-bottom: 16px;
+  }
+}
+.gridSurface {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 22px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+}
+.gridHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  .sort {
+    font-size: 13px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    select {
+      font-size: 13px;
+    }
+  }
+}
+.gridTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+  }
+}
+.gridTitleSub {
+  color: var(--muted);
+  font-weight: 500;
+}
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 18px;
+  align-items: start;
+  > .more,
+  > .lendCta {
+    grid-column: 1 / -1;
+  }
+}
+.inlineFilters {
+  padding: 4px 20px 32px;
+}
+
+/* Mobile list view: full-screen list with the same header as the map. */
+.mobileList {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--surface-2);
+}
+.mobileListHeader {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  > a svg {
+    width: 40px;
+    height: 40px;
+  }
+}
+.mobileListBody {
+  padding-bottom: 96px;
 }

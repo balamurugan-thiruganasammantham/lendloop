@@ -32,6 +32,7 @@ import { useLocation } from "./LocationProvider";
 import { LocationPrompt } from "./LocationPrompt";
 import { MapCarousel } from "./MapCarousel";
 import { useAreaLabel } from "./useAreaLabel";
+import { ViewToggle, type ExploreViewMode } from "./ViewToggle";
 import styles from "./ExploreView.module.scss";
 
 const ExploreMap = dynamic(() => import("@/components/map/ExploreMap"), {
@@ -98,6 +99,11 @@ export function ExploreView() {
     },
     [params, pathname, router],
   );
+
+  // Map or List (cards grid) view; kept in the URL so refresh/back keep it.
+  const view: ExploreViewMode = params.get("view") === "list" ? "list" : "map";
+  const setView = useCallback((v: ExploreViewMode) => replaceParams((p) => (v === "list" ? p.set("view", "list") : p.delete("view"))), [replaceParams]);
+  const listView = view === "list";
 
   // Debounced write of the search text to the URL.
   useEffect(() => {
@@ -167,9 +173,12 @@ export function ExploreView() {
           <span className={styles.crumbCurrent}>{area ?? (point ? "Nearby" : "Everywhere")}</span>
         </nav>
         {!isMobile && (
-          <IconButton label="Hide panel" size="sm" onClick={() => setPanelOpen(false)}>
-            <PanelLeftClose />
-          </IconButton>
+          <div className={styles.headActions}>
+            <ViewToggle value={view} onChange={setView} />
+            <IconButton label="Hide panel" size="sm" onClick={() => setPanelOpen(false)}>
+              <PanelLeftClose />
+            </IconButton>
+          </div>
         )}
       </div>
       <h1 className={clsx(styles.title, "display")}>{search ? `“${search}”` : category !== "ALL" ? CATEGORY_LABELS[category] : title}</h1>
@@ -193,18 +202,98 @@ export function ExploreView() {
           filterCount={filterCount}
         />
       )}
-      <CategoryChips
-        counts={counts}
-        total={all.length}
-        availableCount={availableCount}
-        category={category}
-        onCategory={setCategory}
-        availableOnly={availableOnly}
-        onAvailableOnly={setAvailableOnly}
-      />
+      {!(listView && !isMobile) && (
+        <CategoryChips
+          counts={counts}
+          total={all.length}
+          availableCount={availableCount}
+          category={category}
+          onCategory={setCategory}
+          availableOnly={availableOnly}
+          onAvailableOnly={setAvailableOnly}
+        />
+      )}
       <LocationBanner />
     </header>
   );
+
+  const sortSelect = (label: string) => (
+    <label className={styles.sort}>
+      {label}
+      <select value={sort} onChange={(e) => setFilters({ ...filters, sort: e.target.value as DiscoveryFilters["sort"] })} aria-label="Sort">
+        <option value="nearest" disabled={!point}>
+          Nearest
+        </option>
+        <option value="recent">Recently listed</option>
+        <option value="rating">Best-rated lenders</option>
+      </select>
+    </label>
+  );
+
+  const renderResults = (layout: "column" | "grid") =>
+    result === undefined ? (
+      <LoadingState rows={4} />
+    ) : items.length === 0 ? (
+      <EmptyState
+        compact
+        icon={<Compass />}
+        title={search ? "No tools match your search" : radius ? `No tools within ${radius} km of you` : "No tools found"}
+        description={
+          result.suggestion
+            ? `The closest listings are around ${result.suggestion.label}${point ? ` (${formatDistance(haversineKm(point, result.suggestion))} away)` : ""}.`
+            : "Try removing some filters, or list a tool yourself."
+        }
+        action={
+          <>
+            {radius !== undefined && (
+              <Button size="sm" onClick={() => setFilters({ ...filters, radiusKm: "ANY" })}>
+                Show all distances
+              </Button>
+            )}
+            {result.suggestion && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() =>
+                  location.setManual(
+                    {
+                      lat: result.suggestion!.lat,
+                      lng: result.suggestion!.lng,
+                    },
+                    result.suggestion!.label,
+                  )
+                }
+              >
+                Show tools around {result.suggestion.label.split(",")[0]}
+              </Button>
+            )}
+          </>
+        }
+      />
+    ) : (
+      <div className={layout === "grid" ? styles.cardsGrid : styles.cards} role="list" aria-label="Tools">
+        {items.map((item) => (
+          <div role="listitem" key={item.id}>
+            <ToolCard
+              ref={(el) => {
+                if (el) cardRefs.current.set(item.id, el);
+                else cardRefs.current.delete(item.id);
+              }}
+              item={item}
+              selected={item.id === selectedId}
+              hovered={item.id === hoveredId}
+              onSelect={(id) => selectTool(id)}
+              onHover={setHoveredId}
+            />
+          </div>
+        ))}
+        {result.truncated && <p className={styles.more}>Showing the first {items.length}. Narrow the search to see more.</p>}
+        <Link href="/listings/new" className={styles.lendCta}>
+          <span className="display">Have a tool gathering dust?</span>
+          <span>List it in two minutes — you approve every request.</span>
+        </Link>
+      </div>
+    );
 
   const list = (
     <div className={styles.listWrap}>
@@ -228,89 +317,45 @@ export function ExploreView() {
             <span className="num">{items.length}</span> {items.length === 1 ? "tool" : "tools"}
           </span>
         )}
-        <label className={styles.sort}>
-          Sort:
-          <select
-            value={sort}
-            onChange={(e) =>
-              setFilters({
-                ...filters,
-                sort: e.target.value as DiscoveryFilters["sort"],
-              })
-            }
-            aria-label="Sort"
-          >
-            <option value="nearest" disabled={!point}>
-              Nearest
-            </option>
-            <option value="recent">Recently listed</option>
-            <option value="rating">Best-rated lenders</option>
-          </select>
-        </label>
+        {sortSelect("Sort:")}
       </div>
-      {result === undefined ? (
-        <LoadingState rows={4} />
-      ) : items.length === 0 ? (
-        <EmptyState
-          compact
-          icon={<Compass />}
-          title={search ? "No tools match your search" : radius ? `No tools within ${radius} km of you` : "No tools found"}
-          description={
-            result.suggestion
-              ? `The closest listings are around ${result.suggestion.label}${point ? ` (${formatDistance(haversineKm(point, result.suggestion))} away)` : ""}.`
-              : "Try removing some filters, or list a tool yourself."
-          }
-          action={
-            <>
-              {radius !== undefined && (
-                <Button size="sm" onClick={() => setFilters({ ...filters, radiusKm: "ANY" })}>
-                  Show all distances
-                </Button>
-              )}
-              {result.suggestion && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() =>
-                    location.setManual(
-                      {
-                        lat: result.suggestion!.lat,
-                        lng: result.suggestion!.lng,
-                      },
-                      result.suggestion!.label,
-                    )
-                  }
-                >
-                  Show tools around {result.suggestion.label.split(",")[0]}
-                </Button>
-              )}
-            </>
-          }
-        />
-      ) : (
-        <div className={styles.cards} role="list" aria-label="Tools">
-          {items.map((item) => (
-            <div role="listitem" key={item.id}>
-              <ToolCard
-                ref={(el) => {
-                  if (el) cardRefs.current.set(item.id, el);
-                  else cardRefs.current.delete(item.id);
-                }}
-                item={item}
-                selected={item.id === selectedId}
-                hovered={item.id === hoveredId}
-                onSelect={(id) => selectTool(id)}
-                onHover={setHoveredId}
-              />
-            </div>
-          ))}
-          {result.truncated && <p className={styles.more}>Showing the first {items.length}. Narrow the search to see more.</p>}
-          <Link href="/listings/new" className={styles.lendCta}>
-            <span className="display">Have a tool gathering dust?</span>
-            <span>List it in two minutes — you approve every request.</span>
-          </Link>
+      {renderResults("column")}
+    </div>
+  );
+
+  // List view (desktop): cards grid in the main area, filters inline in the sidebar.
+  const grid = (
+    <div className={styles.gridSurface}>
+      <div className={styles.gridHead}>
+        <div className={styles.gridTitle}>
+          <h2 className="display">
+            <span className="num">{items.length}</span> {items.length === 1 ? "tool" : "tools"}
+            {category !== "ALL" && <span className={styles.gridTitleSub}> in {CATEGORY_LABELS[category]}</span>}
+          </h2>
+          {category !== "ALL" && (
+            <button type="button" className={styles.backLink} onClick={() => setCategory("ALL")}>
+              <ArrowLeft aria-hidden /> All categories
+            </button>
+          )}
         </div>
-      )}
+        {sortSelect("Sort by")}
+      </div>
+      {renderResults("grid")}
+    </div>
+  );
+
+  const inlineFilters = (
+    <div className={styles.inlineFilters}>
+      <FiltersPanel value={filters} onChange={setFilters} hasLocation={!!point} counts={counts} total={all.length} availableCount={availableCount} />
+    </div>
+  );
+
+  const floatingControls = !isMobile && !panelOpen && (
+    <div className={styles.floatingControls}>
+      <button type="button" className={styles.showPanel} onClick={() => setPanelOpen(true)}>
+        <PanelLeftOpen aria-hidden /> {listView ? "Filters" : plural(result?.total ?? 0, "tool")}
+      </button>
+      <ViewToggle value={view} onChange={setView} />
     </div>
   );
 
@@ -335,15 +380,20 @@ export function ExploreView() {
           ) : (
             <div ref={listRef} className={styles.panelScroll}>
               {head}
-              {list}
+              {listView ? inlineFilters : list}
             </div>
           )}
         </aside>
       )}
 
-      <section className={styles.mapArea} aria-label="Map">
-        {isMobile && (
-          <div className={styles.mobileHeader}>
+      {listView && !isMobile ? (
+        <section className={styles.listArea} aria-label="Tools">
+          {floatingControls}
+          {grid}
+        </section>
+      ) : isMobile && listView ? (
+        <section className={styles.mobileList} aria-label="Tools">
+          <div className={styles.mobileListHeader}>
             <Logo compact href="/explore" />
             <div className={styles.mobileSearch}>
               <ExploreSearch
@@ -355,64 +405,88 @@ export function ExploreView() {
                 filterCount={filterCount}
               />
             </div>
+            <ViewToggle compact value={view} onChange={setView} />
           </div>
-        )}
-        <ExploreMap
-          tools={items}
-          selectedId={selectedId}
-          hoveredId={hoveredId}
-          onSelect={(id) => selectTool(id)}
-          onHover={setHoveredId}
-          me={
-            location.state.status === "ready"
-              ? {
-                  point: location.state.point,
-                  source: location.state.source,
-                  accuracy: location.state.accuracy,
-                  label: location.state.label,
-                }
-              : null
-          }
-          radiusKm={radius ?? null}
-          onLocate={locate}
-          locating={location.state.status === "locating"}
-          recenterKey={recenterTick}
-          bottomInset={bottomInset}
-          overlay={
-            (!isMobile || snap !== "full") && <MapCarousel items={items} selectedId={selectedId} onSelect={(id) => selectTool(id)} onHover={setHoveredId} />
-          }
-        />
-        <LocationPrompt />
-        {!isMobile && !panelOpen && (
-          <button type="button" className={styles.showPanel} onClick={() => setPanelOpen(true)}>
-            <PanelLeftOpen aria-hidden /> {plural(result?.total ?? 0, "tool")}
-          </button>
-        )}
-        {isMobile && (
-          <BottomSheet
-            snap={snap}
-            onSnapChange={setSnap}
-            peekHeight={SHEET_PEEK}
-            header={
-              selectedId ? null : (
-                <div className={styles.sheetPeek}>
-                  <h1 className={clsx(styles.sheetTitle, "display")}>{search ? `“${search}”` : title}</h1>
-                  {city && <span className={styles.sheetCount}>{city}</span>}
-                </div>
-              )
-            }
-          >
-            {selectedId ? (
-              detailView
-            ) : (
-              <div className={styles.sheetBody}>
-                {head}
-                {list}
+          {selectedId ? (
+            detailView
+          ) : (
+            <div className={styles.mobileListBody}>
+              {head}
+              {list}
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className={styles.mapArea} aria-label="Map">
+          {isMobile && (
+            <div className={styles.mobileHeader}>
+              <Logo compact href="/explore" />
+              <div className={styles.mobileSearch}>
+                <ExploreSearch
+                  compact
+                  value={query}
+                  onChange={setQuery}
+                  onPickPlace={(p) => location.setManual({ lat: p.lat, lng: p.lng }, p.label)}
+                  onOpenFilters={() => setFiltersOpen(true)}
+                  filterCount={filterCount}
+                />
               </div>
-            )}
-          </BottomSheet>
-        )}
-      </section>
+              <ViewToggle compact value={view} onChange={setView} />
+            </div>
+          )}
+          <ExploreMap
+            tools={items}
+            selectedId={selectedId}
+            hoveredId={hoveredId}
+            onSelect={(id) => selectTool(id)}
+            onHover={setHoveredId}
+            me={
+              location.state.status === "ready"
+                ? {
+                    point: location.state.point,
+                    source: location.state.source,
+                    accuracy: location.state.accuracy,
+                    label: location.state.label,
+                  }
+                : null
+            }
+            radiusKm={radius ?? null}
+            onLocate={locate}
+            locating={location.state.status === "locating"}
+            recenterKey={recenterTick}
+            bottomInset={bottomInset}
+            overlay={
+              (!isMobile || snap !== "full") && <MapCarousel items={items} selectedId={selectedId} onSelect={(id) => selectTool(id)} onHover={setHoveredId} />
+            }
+          />
+          <LocationPrompt />
+          {floatingControls}
+          {isMobile && (
+            <BottomSheet
+              snap={snap}
+              onSnapChange={setSnap}
+              peekHeight={SHEET_PEEK}
+              header={
+                selectedId ? null : (
+                  <div className={styles.sheetPeek}>
+                    <h1 className={clsx(styles.sheetTitle, "display")}>{search ? `“${search}”` : title}</h1>
+                    {city && <span className={styles.sheetCount}>{city}</span>}
+                  </div>
+                )
+              }
+            >
+              {selectedId ? (
+                detailView
+              ) : (
+                <div className={styles.sheetBody}>
+                  {head}
+                  {list}
+                </div>
+              )}
+            </BottomSheet>
+          )}
+        </section>
+      )}
 
       <Dialog
         open={filtersOpen}

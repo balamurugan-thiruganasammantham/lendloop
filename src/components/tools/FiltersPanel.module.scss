@@ -95,3 +95,14 @@
   font-weight: 550;
   font-size: 13px;
 }
+
+.count {
+  margin-left: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.on .count {
+  color: inherit;
+  opacity: 0.75;
+}
