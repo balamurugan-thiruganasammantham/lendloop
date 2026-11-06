@@ -244,7 +244,7 @@ Render's free plan has no persistent disk, so n8n's default SQLite file would be
 | Name | Value |
 | --- | --- |
 | `PORT` | `5678` (tells Render which port n8n listens on) |
-| `WEBHOOK_URL` | `https://<service-name>.onrender.com/` |
+| `N8N_WEBHOOK_URL` | `https://<service-name>.onrender.com/` |
 | `N8N_HOST` | `<service-name>.onrender.com` |
 | `N8N_PROTOCOL` | `https` |
 | `N8N_PROXY_HOPS` | `1` |

@@ -12,11 +12,14 @@ FROM docker.io/n8nio/n8n:2.46.6
 USER root
 COPY workflows /workflows
 COPY scripts/start-with-workflows.sh /start-with-workflows.sh
-RUN chmod 755 /start-with-workflows.sh && chmod -R a+rX /workflows
+COPY scripts/workflow-marker.cjs /workflow-marker.cjs
+RUN chmod 755 /start-with-workflows.sh && chmod 644 /workflow-marker.cjs && chmod -R a+rX /workflows
 USER node
 
 # Non-secret defaults (same as docker-compose.yml). Override on the host if needed.
+# N8N_LISTEN_ADDRESS: n8n defaults to "::" (IPv6); hosts such as Render only route to 0.0.0.0.
 ENV N8N_PORT=5678 \
+    N8N_LISTEN_ADDRESS=0.0.0.0 \
     GENERIC_TIMEZONE=UTC \
     TZ=UTC \
     NODE_FUNCTION_ALLOW_BUILTIN=crypto \
