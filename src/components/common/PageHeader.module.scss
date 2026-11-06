@@ -1,0 +1,37 @@
+@use "mixins" as *;
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 36px 0 20px;
+  @include mobile {
+    padding: 18px 0 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+.eyebrow {
+  @include eyebrow;
+  margin-bottom: 6px;
+}
+.title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  @include mobile {
+    font-size: 27px;
+  }
+}
+.description {
+  margin-top: 6px;
+  color: var(--muted);
+  max-width: 560px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}

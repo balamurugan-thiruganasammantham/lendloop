@@ -1,0 +1,49 @@
+@use "mixins" as *;
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.item {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 16px;
+  padding: 14px 4px 14px 20px;
+  border: 0;
+  background: none;
+  text-align: left;
+  @include hairline;
+  &:hover {
+    background: var(--surface);
+  }
+}
+.unread::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 21px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.title {
+  font-weight: 600;
+}
+.body {
+  grid-column: 1;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+.time {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 12px;
+  color: var(--muted);
+}
+.unread .title {
+  color: var(--ink);
+}

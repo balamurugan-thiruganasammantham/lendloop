@@ -1,0 +1,60 @@
+@use "mixins" as *;
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  @include hairline;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 550;
+  white-space: nowrap;
+  &:hover {
+    color: var(--ink);
+  }
+  &::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: transparent;
+  }
+}
+.active {
+  color: var(--ink);
+  &::after {
+    background: var(--ink);
+  }
+}
+.count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--surface-sunken);
+  color: var(--ink-2);
+  font-size: 10.5px;
+}
+.active .count {
+  background: var(--ink);
+  color: #fff;
+}

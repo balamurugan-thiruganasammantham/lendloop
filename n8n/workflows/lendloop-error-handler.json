@@ -1,0 +1,127 @@
+{
+  "id": "lendloopErrorHdl",
+  "name": "LendLoop - Error Handler",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## LendLoop - Error Handler\nSet as the error workflow of the other LendLoop workflows.\nSends a redacted summary (workflow, execution id, failed node, message, related event id) to Convex `/automation/errors`.\nNever forwards the failing execution's input data. Does not need to be published.",
+        "height": 180,
+        "width": 520
+      },
+      "id": "1806a5e5-dc20-406e-a7ec-a3475172e117",
+      "name": "About",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -220
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e32c6c4a-d34e-4ae2-a1ce-534f1ce34164",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Signed request helper (identical scheme to Convex convex/lib/crypto.ts) ---\n// signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_AUTOMATION_SECRET, `${timestamp}.${nonce}.${body}`))\n// `body` is the exact string the next HTTP Request node sends as its raw body.\nconst crypto = require('crypto');\nfunction signedRequest(path, payload) {\n  const secret = $env.LENDLOOP_AUTOMATION_SECRET;\n  const base = String($env.LENDLOOP_CONVEX_SITE_URL || '').trim().replace(/\\/+$/, '');\n  if (typeof secret !== 'string' || secret.length < 32) throw new Error('LENDLOOP_AUTOMATION_SECRET is not configured');\n  if (!/^https?:\\/\\/\\S+$/.test(base)) throw new Error('LENDLOOP_CONVEX_SITE_URL is not configured');\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${body}`).digest('hex');\n  return { url: base + path, body, timestamp, nonce, signature };\n}\n// -----------------------------------------------------------------------------\n// --- Redaction helper: never forward emails, signatures, secrets or OTP-like numbers ---\nfunction redact(text, max = 1000) {\n  let s = String(text ?? '');\n  for (const name of ['LENDLOOP_AUTOMATION_SECRET', 'LENDLOOP_N8N_WEBHOOK_SECRET']) {\n    const v = $env[name];\n    if (typeof v === 'string' && v.length >= 16) s = s.split(v).join('[redacted]');\n  }\n  return s\n    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, '[email]')\n    .replace(/\\b(bearer|basic)\\s+[A-Za-z0-9._~+/=-]+/gi, '$1 [redacted]')\n    .replace(/sha256=[A-Fa-f0-9]+/g, 'sha256=[redacted]')\n    .replace(/\\b(password|passwd|pass|secret|token|api[_-]?key|authorization)([\"']?\\s*[:=]\\s*[\"']?)[^\\s\"',;&}]+/gi, '$1$2[redacted]')\n    .replace(/\\b\\d{6,}\\b/g, '[number]')\n    .slice(0, max);\n}\n// -----------------------------------------------------------------------------\n// Built only from Error Trigger metadata (workflow, execution id, last node, error message).\n// The failing execution's input payload is never read or forwarded.\nconst data = $input.first().json;\nconst execution = data.execution || {};\nconst trigger = data.trigger || {};\nconst workflow = data.workflow || {};\nconst err = execution.error || trigger.error || {};\n\n// n8n may replace a message with a generic text (e.g. \"The service refused the connection\")\n// and keep the original in `messages`, so combine message, description and messages.\nconst parts = [];\nconst addPart = (s) => { if (typeof s === 'string' && s.trim() && !parts.some((p) => p.includes(s))) parts.push(s.trim()); };\naddPart(typeof err === 'string' ? err : err.message);\naddPart(err.description);\nif (Array.isArray(err.messages)) err.messages.forEach(addPart);\nconst message = parts.join(' - ') || 'Unknown workflow error';\n// LendLoop workflows put the event id in their own error messages (\"... failed for evt_...\").\nconst relatedEvent = message.match(/\\bevt_[A-Za-z0-9]{1,96}\\b/);\nconst failedNode = execution.lastNodeExecuted || err.node?.name;\n\nconst report = {\n  workflowName: String(workflow.name || workflow.id || 'unknown workflow').slice(0, 100),\n  errorMessage: redact(message, 1000) || 'Unknown workflow error',\n  occurredAt: Date.now(),\n};\nif (execution.id !== undefined && execution.id !== null) report.executionId = String(execution.id).slice(0, 100);\nif (failedNode) report.failedNode = String(failedNode).slice(0, 100);\nif (relatedEvent) report.relatedEventId = relatedEvent[0];\n\nreturn [{ json: { report, request: signedRequest('/automation/errors', report) } }];"
+      },
+      "id": "6aee971d-4dc3-4dcd-a526-1412cddc440c",
+      "name": "Build Failure Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.request.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.request.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-nonce",
+              "value": "={{ $json.request.nonce }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.request.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.request.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "1e2cf365-7daf-41d1-a49c-2998cdbb1695",
+      "name": "Report Failure to Convex",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Failure Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Failure Report": {
+      "main": [
+        [
+          {
+            "node": "Report Failure to Convex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

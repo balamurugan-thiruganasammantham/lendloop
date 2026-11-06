@@ -1,0 +1,146 @@
+@use "mixins" as *;
+
+.list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  @include tablet-down {
+    grid-template-columns: 1fr;
+  }
+}
+.requestCol {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.toolLine {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.toolName {
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.badge {
+  margin-left: auto;
+}
+.muted {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.dates {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  dt {
+    @include eyebrow;
+    font-size: 9.5px;
+  }
+  dd {
+    margin: 3px 0 0;
+    font-weight: 550;
+    font-size: 13.5px;
+  }
+  @include mobile {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.message {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-2);
+  font-size: 14px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 550;
+  color: var(--accent);
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+.borrowerCol {
+  padding: 18px;
+  background: var(--surface-2);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  @include tablet-down {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+.person {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.personName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.profile {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--accent);
+}
+.subhead {
+  @include eyebrow;
+  margin-bottom: 6px;
+}
+.recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  li {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    font-size: 12.5px;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--line);
+    span:first-child {
+      flex: 1;
+      @include truncate;
+    }
+  }
+}
+.late {
+  color: var(--warn);
+}
+.ok {
+  color: var(--success);
+}

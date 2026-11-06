@@ -1,0 +1,42 @@
+@use "mixins" as *;
+
+.frame {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  @include tablet-down {
+    grid-template-columns: 1fr;
+  }
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 28px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  h1 {
+    font-size: 28px;
+  }
+  p {
+    margin-top: 8px;
+    color: var(--muted);
+  }
+  @include tablet-down {
+    gap: 16px;
+    border-right: 0;
+    @include hairline;
+    padding: 20px;
+  }
+}
+.tagline {
+  @include eyebrow;
+  @include tablet-down {
+    display: none;
+  }
+}
+.main {
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+}

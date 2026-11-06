@@ -1,0 +1,51 @@
+@use "mixins" as *;
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  li {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 0;
+    @include hairline;
+  }
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.author {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.role,
+.date {
+  font-size: 12px;
+  color: var(--muted);
+}
+.date {
+  margin-left: auto;
+}
+.comment {
+  font-size: 14px;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  span {
+    padding: 2px 8px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-sunken);
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+}
+.empty {
+  color: var(--muted);
+  padding: 12px 0;
+}

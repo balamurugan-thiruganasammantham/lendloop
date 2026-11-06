@@ -1,0 +1,74 @@
+@use "mixins" as *;
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 950;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(247 247 244 / 0.35);
+  backdrop-filter: blur(2px);
+}
+.card {
+  width: min(400px, 100%);
+  padding: 24px;
+  @include glass;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: rise 220ms var(--ease);
+  h2 {
+    font-size: 19px;
+  }
+  p {
+    color: var(--ink-2);
+    font-size: 13.5px;
+  }
+}
+.icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  svg {
+    width: 19px;
+    height: 19px;
+  }
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.manual {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.link {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  &:hover {
+    color: var(--ink);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

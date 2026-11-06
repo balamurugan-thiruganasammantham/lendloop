@@ -1,0 +1,143 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  transition:
+    background 140ms var(--ease),
+    border-color 140ms var(--ease),
+    color 140ms var(--ease),
+    transform 80ms var(--ease);
+  svg {
+    width: 15px;
+    height: 15px;
+    flex: none;
+  }
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+.md {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13.5px;
+}
+.lg {
+  height: 48px;
+  padding: 0 20px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+.block {
+  width: 100%;
+}
+
+.primary {
+  background: var(--ink);
+  color: #fffaf3;
+  &:hover:not(:disabled) {
+    background: #000;
+  }
+}
+.accent {
+  background: var(--accent);
+  color: var(--accent-ink);
+  &:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+}
+.ink {
+  background: var(--ink);
+  color: #fff;
+  &:hover:not(:disabled) {
+    background: #000;
+  }
+}
+.secondary {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  &:hover:not(:disabled) {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+  }
+}
+.ghost {
+  background: transparent;
+  color: var(--ink-2);
+  &:hover:not(:disabled) {
+    background: var(--surface-sunken);
+    color: var(--ink);
+  }
+}
+.danger {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+  color: var(--danger);
+  &:hover:not(:disabled) {
+    background: var(--danger-soft);
+  }
+}
+
+.iconButton {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-2);
+  transition:
+    background 140ms var(--ease),
+    color 140ms var(--ease);
+  &:hover:not(:disabled) {
+    background: var(--surface-sunken);
+    color: var(--ink);
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+.icon-sm {
+  width: 28px;
+  height: 28px;
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+.icon-md {
+  width: 36px;
+  height: 36px;
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+}
+.icon-surface {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: var(--shadow-1);
+  &:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+}

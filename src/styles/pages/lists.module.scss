@@ -1,0 +1,190 @@
+// Shared styles for list-style pages (listings, requests, loans, history).
+@use "mixins" as *;
+
+.list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition:
+    box-shadow 160ms var(--ease),
+    transform 160ms var(--ease);
+  &:hover {
+    box-shadow: var(--shadow-hover);
+  }
+  > span:first-child,
+  .rowLink > span:first-child {
+    border-radius: 12px;
+  }
+  @include mobile {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+.rowLink {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  &:hover .title {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+.meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+.strong {
+  color: var(--ink);
+  font-weight: 550;
+}
+.inlineLink {
+  color: var(--accent);
+  font-weight: 550;
+}
+.subList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  @include mobile {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+.iconLink {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  &:hover {
+    background: var(--surface-sunken);
+  }
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+.primaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: #fffaf3;
+  font-weight: 550;
+  font-size: 13.5px;
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+  &:hover {
+    background: #000;
+  }
+}
+.secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-weight: 550;
+  font-size: 12.5px;
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+  &:hover {
+    border-color: var(--line-strong);
+  }
+}
+.tabs {
+  margin-bottom: 4px;
+}
+.right {
+  text-align: right;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  @include mobile {
+    text-align: left;
+    align-items: flex-start;
+  }
+}
+.time {
+  font-size: 12px;
+  color: var(--muted);
+}
+.note {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.section {
+  margin-bottom: 28px;
+}
+.sectionLabel {
+  @include eyebrow;
+  margin-bottom: 8px;
+}

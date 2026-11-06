@@ -39,3 +39,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+!.env.example
+!**/.env.example
+
+# clerk keyless dev keys
+.clerk/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# local tooling
+/tmp/
+
+# generated (scripts/copy-maplibre-worker.mjs)
+/public/vendor/
+
+# Local copies of deployment values (never commit)
+/secrets/

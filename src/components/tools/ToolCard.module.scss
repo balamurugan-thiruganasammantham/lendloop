@@ -1,0 +1,239 @@
+@use "mixins" as *;
+
+.wrap {
+  position: relative;
+}
+/* Sits exactly where the distance pill goes (media margin 8px + pill offset 10px). */
+.locate {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+  transition: top 180ms var(--ease);
+}
+/* Keep the lift effect while the pointer is over the location button. */
+.wrap:hover > .card {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+.wrap:hover > .locate {
+  top: 16px;
+}
+
+.card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 180ms var(--ease),
+    box-shadow 180ms var(--ease),
+    border-color 180ms var(--ease);
+  &:hover,
+  &.hovered {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+}
+.featured {
+  border-color: var(--gold-ring);
+  box-shadow:
+    0 0 0 1px rgb(201 160 60 / 0.25),
+    var(--shadow-card);
+}
+.selected {
+  border-color: var(--ink);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    var(--shadow-hover);
+}
+
+.media {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  margin: 8px 8px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 500ms var(--ease);
+  }
+}
+.card:hover .media img {
+  transform: scale(1.03);
+}
+.placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted-2);
+  background: radial-gradient(
+    circle at 30% 25%,
+    #fffdf8,
+    var(--surface-sunken)
+  );
+  svg {
+    width: 34%;
+    height: 34%;
+  }
+}
+.status,
+.distance {
+  position: absolute;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgb(255 254 251 / 0.94);
+  backdrop-filter: blur(6px);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgb(31 27 22 / 0.12);
+}
+.status {
+  left: 10px;
+}
+.distance {
+  right: 10px;
+}
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 3px rgb(47 191 113 / 0.2);
+}
+.statusReserved .statusDot {
+  background: #e3a52f;
+  box-shadow: 0 0 0 3px rgb(227 165 47 / 0.2);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 14px;
+}
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.name {
+  font-size: 19px;
+  line-height: 1.2;
+  color: var(--ink);
+  @include truncate;
+}
+.rating {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.meta {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.owner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  min-width: 0;
+}
+.ownerName {
+  font-weight: 600;
+  @include truncate;
+  max-width: 120px;
+}
+.trusted {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--gold-ink);
+  font-weight: 600;
+  font-size: 11.5px;
+  svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+.area {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  @include truncate;
+  svg {
+    width: 12px;
+    height: 12px;
+    flex: none;
+  }
+}
+.excerpt {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.tagGold {
+  background: var(--gold-soft);
+  color: var(--gold-ink);
+  font-weight: 600;
+}
+.tagSample {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tagMine {
+  background: var(--ink);
+  color: #fffaf3;
+  font-weight: 600;
+}

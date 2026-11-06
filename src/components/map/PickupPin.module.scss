@@ -1,0 +1,18 @@
+.pin {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50% 50% 50% 0;
+  rotate: -45deg;
+  margin-bottom: 6px;
+  background: var(--ink);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.3);
+  svg {
+    rotate: 45deg;
+    width: 16px;
+    height: 16px;
+    color: #fff;
+  }
+}

@@ -1,0 +1,55 @@
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--ink-2);
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+.md {
+  font-size: 14px;
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+.filled {
+  fill: #c9932b;
+  color: #c9932b;
+}
+.count {
+  color: var(--muted);
+}
+.none {
+  color: var(--muted);
+}
+.input {
+  display: inline-flex;
+  gap: 4px;
+}
+.star {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--line-strong);
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+  &:hover {
+    border-color: var(--line-strong);
+  }
+}
+.on {
+  color: #c9932b;
+  svg {
+    fill: #c9932b;
+  }
+}

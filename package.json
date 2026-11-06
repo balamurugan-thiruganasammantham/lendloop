@@ -1,24 +1,62 @@
 {
-  "name": "infuence",
+  "name": "lendloop",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:convex": "convex dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p convex",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project convex",
+    "test:e2e": "playwright test",
+    "seed": "convex run seed:run && node scripts/seed-images.mjs",
+    "seed:reset": "convex run seed:reset",
+    "n8n:up": "docker compose up -d n8n",
+    "n8n:down": "docker compose down",
+    "postinstall": "node scripts/copy-maplibre-worker.mjs",
+    "predev": "node scripts/copy-maplibre-worker.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
+    "seed:images": "node scripts/seed-images.mjs"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.24",
+    "@hookform/resolvers": "^7.0.3",
+    "@tanstack/react-query": "^5.106.1",
+    "clsx": "^2.1.1",
+    "convex": "^1.49.0",
+    "lucide-react": "^1.69.0",
+    "mapbox-gl": "^3.34.2",
+    "maplibre-gl": "^6.16.0",
     "next": "16.4.5",
+    "nodemailer": "^10.3.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "react-hook-form": "^7.91.0",
+    "supercluster": "^9.1.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@clerk/testing": "^2.2.54",
+    "@edge-runtime/vm": "^5.0.0",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.19.2",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/supercluster": "^7.1.3",
+    "convex-test": "^0.0.67",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
-    "typescript": "^5"
+    "prettier": "^3.9.10",
+    "sass": "^1.107.1",
+    "typescript": "^5",
+    "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=20.9"
   }
 }

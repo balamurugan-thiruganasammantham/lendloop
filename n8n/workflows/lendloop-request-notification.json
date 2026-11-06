@@ -1,0 +1,757 @@
+{
+  "id": "lendloopReqNotif",
+  "name": "LendLoop - Request Notification",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## LendLoop - Request Notification\nConvex POSTs signed events to **/webhook/lendloop-events**.\n1. Verify HMAC + timestamp (401)\n2. Strict payload validation (400)\n3. Claim event in Convex (dedup): duplicate/unknown => 200, in_progress => 409 (Convex retries later)\n4. Email: SMTP if `LENDLOOP_EMAIL_MODE=smtp`, otherwise MOCKED\n5. Report result to Convex, respond 200 (SENT/MOCKED) or 502 (FAILED => Convex retries)\n\nSecrets come from `$env` (see n8n/README.md). No credentials are stored in this file.",
+        "height": 300,
+        "width": 520
+      },
+      "id": "e6feca37-965d-474a-abcc-83774b6ff565",
+      "name": "About",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3fd3e9ed-6d66-4f77-af05-b59712455302",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "95a61161-9967-4c03-a17c-269e0857c0ac"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verifies the HMAC signature Convex puts on every webhook (same scheme both ways):\n//   x-lendloop-signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_N8N_WEBHOOK_SECRET, `${timestamp}.${nonce}.${rawBody}`))\n// Raw body: Convex sends JSON.stringify(payload) (compact, plain strings/numbers/nulls,\n// fixed key order), so JSON.stringify of the parsed body reproduces the exact bytes.\n// Output is only { ok, reason } - nothing from the payload is copied here.\nconst crypto = require('crypto');\nconst TOLERANCE_SECONDS = 300;\n\nconst req = $input.first().json;\nconst headers = req.headers || {};\nconst secret = $env.LENDLOOP_N8N_WEBHOOK_SECRET;\nconst fail = (reason) => [{ json: { ok: false, reason } }];\n\nif (typeof secret !== 'string' || secret.length < 32) return fail('not_configured');\n\nconst timestamp = String(headers['x-lendloop-timestamp'] ?? '');\nconst nonce = String(headers['x-lendloop-nonce'] ?? '');\nconst signature = String(headers['x-lendloop-signature'] ?? '');\nif (!timestamp || !nonce || !signature) return fail('missing_headers');\nif (!/^\\d{9,11}$/.test(timestamp)) return fail('bad_timestamp');\nif (nonce.length > 100) return fail('bad_nonce');\nif (Math.abs(Date.now() / 1000 - Number(timestamp)) > TOLERANCE_SECONDS) return fail('stale_timestamp');\nif (req.body === null || typeof req.body !== 'object') return fail('missing_body');\n\nconst rawBody = JSON.stringify(req.body);\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${rawBody}`).digest('hex');\nconst a = Buffer.from(expected, 'utf8');\nconst b = Buffer.from(signature, 'utf8');\n// timingSafeEqual requires equal lengths; the length check leaks nothing useful (fixed-length hex).\nconst ok = a.length === b.length && crypto.timingSafeEqual(a, b);\nreturn [{ json: { ok, reason: ok ? 'ok' : 'bad_signature' } }];"
+      },
+      "id": "004394fa-33c2-45da-a199-d3c9d576982d",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1b0c33fe-934c-4500-a534-39cfc9aa8979",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0e4b2cd5-4756-4e64-a329-d6bc179adb51",
+      "name": "Signature Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.reason === 'not_configured' ? 'not_configured' : 'unauthorized' }) }}",
+        "options": {
+          "responseCode": "={{ $json.reason === 'not_configured' ? 503 : 401 }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "cache-control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "7ef6a413-b53c-4db4-af9e-72fe1cb81472",
+      "name": "Respond: Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        660,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Strict validation of the LendLoop webhook payload (schemaVersion 1).\n// On failure only field paths are returned (never values, so no email leaks).\nconst EVENT_TYPES = [\n  'borrow_request.created', 'borrow_request.approved', 'borrow_request.declined',\n  'borrow_request.cancelled', 'borrow_request.expired',\n  'loan.collected', 'loan.return_requested', 'loan.returned', 'loan.damage_reported',\n  'loan.not_returned_reported', 'loan.cancelled',\n  'admin.action',\n];\nconst ID = /^[A-Za-z0-9]+$/;\nconst EVENT_ID = /^evt_[A-Za-z0-9]+$/;\nconst ISO_DATE = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$/;\nconst EMAIL = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;\nconst URL_RE = /^https?:\\/\\/[^\\s<>\"]+$/;\nconst SINGLE_LINE_BAD = /[\\u0000-\\u001f\\u007f]/; // no CR/LF etc. (title becomes an email header)\nconst MULTI_LINE_BAD = /[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]/;\n\nconst webhook = $('Webhook').first().json;\nconst p = webhook.body;\nconst issues = [];\nconst isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);\nconst has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);\n\nfunction str(path, v, { min = 1, max, pattern, multiline = false, nullable = false }) {\n  if (v === null && nullable) return;\n  if (typeof v !== 'string') return issues.push(`${path}: expected string${nullable ? ' or null' : ''}`);\n  if (v.length < min || v.length > max) return issues.push(`${path}: length must be ${min}-${max}`);\n  if ((multiline ? MULTI_LINE_BAD : SINGLE_LINE_BAD).test(v)) return issues.push(`${path}: control characters not allowed`);\n  if (pattern && !pattern.test(v)) issues.push(`${path}: invalid format`);\n}\n// Every listed key is required; any other key is rejected.\nfunction shape(path, obj, spec) {\n  if (!isObj(obj)) return issues.push(`${path || 'body'}: expected object`);\n  const prefix = path ? `${path}.` : '';\n  for (const key of Object.keys(obj)) if (!has(spec, key)) issues.push(`${prefix}${key}: unexpected field`);\n  for (const [key, check] of Object.entries(spec)) {\n    if (!has(obj, key)) issues.push(`${prefix}${key}: required`);\n    else check(`${prefix}${key}`, obj[key]);\n  }\n}\n\nshape('', p, {\n  schemaVersion: (k, v) => { if (v !== 1) issues.push(`${k}: must be 1`); },\n  eventId: (k, v) => str(k, v, { max: 100, pattern: EVENT_ID }),\n  eventType: (k, v) => { if (!EVENT_TYPES.includes(v)) issues.push(`${k}: unsupported value`); },\n  occurredAt: (k, v) => {\n    str(k, v, { max: 30, pattern: ISO_DATE });\n    if (typeof v === 'string' && ISO_DATE.test(v) && Number.isNaN(Date.parse(v))) issues.push(`${k}: invalid date`);\n  },\n  recipient: (k, v) => shape(k, v, {\n    userId: (k2, v2) => str(k2, v2, { max: 64, pattern: ID }),\n    email: (k2, v2) => str(k2, v2, { min: 3, max: 254, pattern: EMAIL }),\n    displayName: (k2, v2) => str(k2, v2, { max: 100 }),\n  }),\n  subject: (k, v) => shape(k, v, {\n    requestId: (k2, v2) => str(k2, v2, { max: 64, pattern: ID, nullable: true }),\n    loanId: (k2, v2) => str(k2, v2, { max: 64, pattern: ID, nullable: true }),\n    toolId: (k2, v2) => str(k2, v2, { max: 64, pattern: ID, nullable: true }),\n    toolName: (k2, v2) => str(k2, v2, { max: 200, nullable: true }),\n    status: (k2, v2) => str(k2, v2, { max: 50, pattern: /^[A-Za-z_]+$/, nullable: true }),\n  }),\n  message: (k, v) => shape(k, v, {\n    title: (k2, v2) => str(k2, v2, { max: 200 }),\n    body: (k2, v2) => str(k2, v2, { max: 5000, multiline: true }),\n  }),\n  link: (k, v) => str(k, v, { max: 2048, pattern: URL_RE }),\n});\n\nconst headerEventId = (webhook.headers || {})['x-lendloop-event-id'];\nif (headerEventId !== undefined && isObj(p) && headerEventId !== p.eventId) {\n  issues.push('x-lendloop-event-id: does not match eventId');\n}\n\nif (issues.length > 0) return [{ json: { valid: false, issues: issues.slice(0, 25) } }];\n\nreturn [{\n  json: {\n    valid: true,\n    event: {\n      eventId: p.eventId,\n      eventType: p.eventType,\n      to: p.recipient.email,\n      title: p.message.title,\n      body: p.message.body,\n      link: p.link,\n    },\n  },\n}];"
+      },
+      "id": "2e35a28f-ccd4-4a47-a690-03fdd763769d",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "74fa93b5-c9a0-47de-a00b-3aca2d533c65",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3151034d-0d63-4194-a096-0cb9f643ef3c",
+      "name": "Payload Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'invalid_payload', issues: $json.issues }) }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "cache-control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "1067fc98-212e-4305-ac6f-473ddae102ab",
+      "name": "Respond: Invalid Payload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1100,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Signed request helper (identical scheme to Convex convex/lib/crypto.ts) ---\n// signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_AUTOMATION_SECRET, `${timestamp}.${nonce}.${body}`))\n// `body` is the exact string the next HTTP Request node sends as its raw body.\nconst crypto = require('crypto');\nfunction signedRequest(path, payload) {\n  const secret = $env.LENDLOOP_AUTOMATION_SECRET;\n  const base = String($env.LENDLOOP_CONVEX_SITE_URL || '').trim().replace(/\\/+$/, '');\n  if (typeof secret !== 'string' || secret.length < 32) throw new Error('LENDLOOP_AUTOMATION_SECRET is not configured');\n  if (!/^https?:\\/\\/\\S+$/.test(base)) throw new Error('LENDLOOP_CONVEX_SITE_URL is not configured');\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${body}`).digest('hex');\n  return { url: base + path, body, timestamp, nonce, signature };\n}\n// -----------------------------------------------------------------------------\n// Dedup: claim the event in Convex before sending anything.\nconst { eventId } = $input.first().json.event;\nconst request = signedRequest('/automation/events/claim', { eventId, executionId: String($execution.id) });\nreturn [{ json: { eventId, request } }];"
+      },
+      "id": "dc4b439d-e5f3-4fe6-af2a-ed85371d36d4",
+      "name": "Sign Claim Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.request.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.request.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-nonce",
+              "value": "={{ $json.request.nonce }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.request.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.request.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "ff3116a8-dc5d-41d0-a80a-b437ec1e80c4",
+      "name": "Claim Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "78e4a74c-4e73-4712-ad5a-3c5f844076ac",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "claimed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "91919c7b-9f5a-4d9e-a77b-093acfd96652",
+      "name": "Claimed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.status === 'in_progress' ? { ok: false, status: 'in_progress' } : { ok: true, status: $json.status === 'duplicate' ? 'duplicate' : 'unknown' }) }}",
+        "options": {
+          "responseCode": "={{ $json.status === 'in_progress' ? 409 : 200 }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "cache-control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c32010b4-3063-490c-a775-b5a80e90adc5",
+      "name": "Respond: Not Claimed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1760,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Minimal email: subject = message.title, plain-text body = message.body + link. Nothing else.\nconst ev = $('Validate Payload').first().json.event;\nconst mode = String($env.LENDLOOP_EMAIL_MODE || 'mock').trim().toLowerCase() === 'smtp' ? 'smtp' : 'mock';\nreturn [{\n  json: {\n    mode,\n    email: {\n      to: ev.to,\n      subject: ev.title.replace(/[\\r\\n]+/g, ' '),\n      text: `${ev.body}\\n\\n${ev.link}`,\n    },\n  },\n}];"
+      },
+      "id": "12e9365d-055d-471a-a71f-d2b779a76d1b",
+      "name": "Build Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5e523480-db20-46ba-aec4-8c553efed4ef",
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "smtp",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5d978dad-aac6-4ed1-a025-757782fcd28e",
+      "name": "SMTP Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.LENDLOOP_EMAIL_FROM }}",
+        "toEmail": "={{ $json.email.to }}",
+        "subject": "={{ $json.email.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.email.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d6267944-cc40-4216-a1b6-20e7cce9d174",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        -240
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "lendloopSmtpCred",
+          "name": "LendLoop SMTP"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Redaction helper: never forward emails, signatures, secrets or OTP-like numbers ---\nfunction redact(text, max = 1000) {\n  let s = String(text ?? '');\n  for (const name of ['LENDLOOP_AUTOMATION_SECRET', 'LENDLOOP_N8N_WEBHOOK_SECRET']) {\n    const v = $env[name];\n    if (typeof v === 'string' && v.length >= 16) s = s.split(v).join('[redacted]');\n  }\n  return s\n    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, '[email]')\n    .replace(/\\b(bearer|basic)\\s+[A-Za-z0-9._~+/=-]+/gi, '$1 [redacted]')\n    .replace(/sha256=[A-Fa-f0-9]+/g, 'sha256=[redacted]')\n    .replace(/\\b(password|passwd|pass|secret|token|api[_-]?key|authorization)([\"']?\\s*[:=]\\s*[\"']?)[^\\s\"',;&}]+/gi, '$1$2[redacted]')\n    .replace(/\\b\\d{6,}\\b/g, '[number]')\n    .slice(0, max);\n}\n// -----------------------------------------------------------------------------\n// \"Send Email\" runs with On Error = continue. Only report SENT on positive evidence from the\n// SMTP server: if the node failed before sending (e.g. missing credential) n8n passes the\n// input item through unchanged, without an `error` field.\nconst out = $input.first().json;\nconst fail = (why) => [{ json: { result: 'FAILED', error: redact(`SMTP send failed: ${why}`) } }];\nif (out.error) {\n  const e = out.error;\n  return fail(typeof e === 'string' ? e : (e.message || e.description || 'unknown error'));\n}\nif (Array.isArray(out.rejected) && out.rejected.length > 0) return fail('recipient rejected by the SMTP server');\nconst accepted = Array.isArray(out.accepted) && out.accepted.length > 0;\nif (!accepted && typeof out.messageId !== 'string') {\n  return fail('the Send Email node returned no SMTP result - check that the \"LendLoop SMTP\" credential exists and is selected');\n}\nreturn [{ json: { result: 'SENT' } }];"
+      },
+      "id": "1c0709ec-2ad1-4201-afcd-9358d1ab51f4",
+      "name": "SMTP Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// LENDLOOP_EMAIL_MODE is not \"smtp\": no email is sent, the delivery is reported as MOCKED.\nreturn [{ json: { result: 'MOCKED' } }];"
+      },
+      "id": "25ae0318-7c84-4d25-acaa-211f52f160e0",
+      "name": "Mock Send (No Email)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Signed request helper (identical scheme to Convex convex/lib/crypto.ts) ---\n// signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_AUTOMATION_SECRET, `${timestamp}.${nonce}.${body}`))\n// `body` is the exact string the next HTTP Request node sends as its raw body.\nconst crypto = require('crypto');\nfunction signedRequest(path, payload) {\n  const secret = $env.LENDLOOP_AUTOMATION_SECRET;\n  const base = String($env.LENDLOOP_CONVEX_SITE_URL || '').trim().replace(/\\/+$/, '');\n  if (typeof secret !== 'string' || secret.length < 32) throw new Error('LENDLOOP_AUTOMATION_SECRET is not configured');\n  if (!/^https?:\\/\\/\\S+$/.test(base)) throw new Error('LENDLOOP_CONVEX_SITE_URL is not configured');\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${body}`).digest('hex');\n  return { url: base + path, body, timestamp, nonce, signature };\n}\n// -----------------------------------------------------------------------------\n// Report the delivery outcome so Convex records it (and releases the claim on FAILED).\nconst { eventId } = $('Validate Payload').first().json.event;\nconst { result, error } = $input.first().json;\nconst payload = { eventId, executionId: String($execution.id), result };\nif (result === 'FAILED') payload.error = String(error || 'Email delivery failed').slice(0, 1000);\nreturn [{ json: { result, request: signedRequest('/automation/events/report', payload) } }];"
+      },
+      "id": "9671b5c2-eb19-475f-a219-534023a7234e",
+      "name": "Sign Report Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.request.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.request.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-nonce",
+              "value": "={{ $json.request.nonce }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.request.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.request.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "3b505698-5ade-434a-a0ee-d6cb7ae7861b",
+      "name": "Report Delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        -100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Sign Report Request').first().json.result === 'FAILED' ? { ok: false, status: 'FAILED' } : { ok: true, status: $('Sign Report Request').first().json.result }) }}",
+        "options": {
+          "responseCode": "={{ $('Sign Report Request').first().json.result === 'FAILED' ? 502 : 200 }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "cache-control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "3c0b8c21-ba75-4432-a5fb-ca46dce4dcb8",
+      "name": "Respond: Delivery Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        3080,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: \"automation_backend_error\" }) }}",
+        "options": {
+          "responseCode": 502,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "cache-control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f56c3ce7-d78a-40b7-a3f0-91fdeca183bb",
+      "name": "Respond: Backend Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1760,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "errorType": "errorObject",
+        "errorObject": "={{ JSON.stringify({ message: ($('Report Delivery').isExecuted ? 'Report Delivery' : 'Claim Event') + ' failed for ' + $('Validate Payload').first().json.event.eventId, description: String($json.error?.message ?? $json.error ?? 'unknown error').slice(0, 500) }) }}"
+      },
+      "id": "1bdb42bd-03e2-4315-a312-859061839410",
+      "name": "Fail: Convex Call",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        600
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signature": {
+      "main": [
+        [
+          {
+            "node": "Signature Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature Valid?": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Payload Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload Valid?": {
+      "main": [
+        [
+          {
+            "node": "Sign Claim Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Invalid Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Claim Request": {
+      "main": [
+        [
+          {
+            "node": "Claim Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Event": {
+      "main": [
+        [
+          {
+            "node": "Claimed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Backend Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claimed?": {
+      "main": [
+        [
+          {
+            "node": "Build Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Not Claimed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email": {
+      "main": [
+        [
+          {
+            "node": "SMTP Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMTP Mode?": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mock Send (No Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "SMTP Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMTP Result": {
+      "main": [
+        [
+          {
+            "node": "Sign Report Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Send (No Email)": {
+      "main": [
+        [
+          {
+            "node": "Sign Report Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Report Request": {
+      "main": [
+        [
+          {
+            "node": "Report Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Delivery": {
+      "main": [
+        [
+          {
+            "node": "Respond: Delivery Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Backend Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond: Backend Error": {
+      "main": [
+        [
+          {
+            "node": "Fail: Convex Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "lendloopErrorHdl",
+    "executionTimeout": 300
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

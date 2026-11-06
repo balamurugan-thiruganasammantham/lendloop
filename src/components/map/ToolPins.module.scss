@@ -1,0 +1,252 @@
+// Circular image pins: white ring, soft shadow, availability dot, name label.
+// Sized for legibility (56px, 64px selected).
+
+.pin {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  &:focus-visible .ring {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+  }
+}
+
+.ring {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #fff;
+  box-shadow:
+    0 1px 2px rgb(31 27 22 / 0.2),
+    0 10px 22px -8px rgb(31 27 22 / 0.42);
+  transition:
+    transform 180ms var(--ease),
+    box-shadow 180ms var(--ease);
+}
+
+.image {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  color: var(--muted);
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  svg {
+    width: 46%;
+    height: 46%;
+  }
+}
+
+.imageSm {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 2.5px solid #fff;
+  margin-left: -14px;
+  box-shadow: 0 2px 8px rgb(31 27 22 / 0.28);
+  &:first-child {
+    margin-left: 0;
+  }
+}
+
+.dot {
+  position: absolute;
+  right: -2px;
+  bottom: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--live);
+  border: 2.5px solid #fff;
+}
+.dotReserved {
+  background: #e3a52f;
+}
+
+.star {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2.5px solid #fff;
+  color: #fff;
+  svg {
+    width: 10px;
+    height: 10px;
+    fill: currentColor;
+  }
+}
+
+.trusted .ring {
+  box-shadow:
+    0 0 0 2.5px var(--gold-ring),
+    0 10px 22px -8px rgb(31 27 22 / 0.42);
+  animation: pop 7s ease-in-out infinite both;
+}
+
+// Label hangs below the circle without affecting the marker's anchor.
+.label {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 150px;
+  padding: 0 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 3px #fff,
+    0 0 6px #fff,
+    0 0 8px #fff;
+}
+
+.labelName {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.labelDistance {
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2f6fd0;
+}
+.selected .labelDistance {
+  color: #b9d3fb;
+}
+
+.hover .ring,
+.pin:hover .ring {
+  transform: scale(1.12);
+}
+
+.selected {
+  .ring {
+    transform: scale(1.16);
+    border-color: var(--ink);
+    box-shadow:
+      0 0 0 3px #fff,
+      0 14px 28px -8px rgb(31 27 22 / 0.55);
+    animation: none;
+  }
+  .label {
+    top: calc(100% + 10px);
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: #fff;
+    text-shadow: none;
+    font-size: 12.5px;
+  }
+}
+
+.cluster {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 5px 13px 5px 5px;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 254 251 / 0.97);
+  box-shadow:
+    0 1px 2px rgb(31 27 22 / 0.18),
+    0 12px 26px -10px rgb(31 27 22 / 0.42);
+  cursor: pointer;
+  transition: transform 160ms var(--ease);
+  &:hover {
+    transform: scale(1.06);
+  }
+}
+.stack {
+  display: flex;
+}
+.count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+// Zoomed-out region pill, e.g. "Bengaluru · 17 tools".
+.region {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid rgb(231 224 211 / 0.9);
+  border-radius: 14px;
+  background: rgb(255 254 251 / 0.97);
+  box-shadow:
+    0 1px 2px rgb(31 27 22 / 0.15),
+    0 14px 30px -12px rgb(31 27 22 / 0.45);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 160ms var(--ease);
+  &:hover {
+    transform: scale(1.05);
+  }
+  .imageSm {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border-width: 0;
+    box-shadow: none;
+  }
+}
+.regionText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.regionName {
+  font-size: 16px;
+  color: var(--ink);
+}
+.regionCount {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@keyframes pop {
+  0%,
+  92%,
+  100% {
+    transform: scale(1);
+  }
+  95% {
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trusted .ring {
+    animation: none;
+  }
+}

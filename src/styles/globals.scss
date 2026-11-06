@@ -1,0 +1,188 @@
+@use "mixins" as *;
+@use "map";
+
+:root {
+  // Surfaces — warm, paper-like neutrals
+  --bg: #f5f2ea;
+  --surface: #fffefb;
+  --surface-2: #faf7f1;
+  --surface-sunken: #f1ece3;
+  --hover: #f3eee6;
+  --map-bg: #efede9;
+
+  // Ink
+  --ink: #1f1b16;
+  --ink-2: #4a433a;
+  --muted: #736a5e;
+  --muted-2: #a0978a;
+
+  // Lines
+  --line: #e7e0d3;
+  --line-soft: #efeae0;
+  --line-strong: #d8cfbf;
+
+  // Brand: restrained dark green
+  --accent: #1f4d3a;
+  --accent-hover: #173c2d;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6eee8;
+  --accent-line: #c6d7cc;
+
+  // Signals
+  --live: #2fbf71;
+  --gold: #c9a13c;
+  --gold-soft: #f5ebcf;
+  --gold-ink: #7a5a12;
+  --gold-ring: rgb(176 138 40 / 0.65);
+
+  // Semantic
+  --success: #2e6b4a;
+  --success-soft: #e5f1e8;
+  --warn: #8a5a12;
+  --warn-soft: #f8eedd;
+  --danger: #b4432f;
+  --danger-soft: #f8e6e1;
+  --info: #2c557d;
+  --info-soft: #e6edf5;
+  --focus: #2b6cb0;
+
+  // Type
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  // Radii
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-sheet: 20px;
+
+  // Elevation (warm-tinted, soft)
+  --shadow-1: 0 1px 2px rgb(70 45 20 / 0.06);
+  --shadow-card: 0 1px 0 rgb(70 45 20 / 0.04), 0 14px 34px -18px rgb(70 45 20 / 0.2);
+  --shadow-hover: 0 1px 0 rgb(70 45 20 / 0.05), 0 18px 40px -16px rgb(70 45 20 / 0.28);
+  --shadow-float: 0 2px 4px rgb(70 45 20 / 0.06), 0 18px 44px -18px rgb(70 45 20 / 0.32);
+  --shadow-modal: 0 24px 64px -20px rgb(31 27 22 / 0.38);
+
+  // Layout
+  --topbar-h: 0px;
+  --rail-w: 88px;
+  --panel-w: 432px;
+  --tabbar-h: 0px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  @include mobile {
+    --topbar-h: 64px;
+    --tabbar-h: 66px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-weight: 600;
+}
+
+/* Editorial display face for titles and names. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  @include focus-ring;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.admin-body {
+  padding-top: 16px;
+}

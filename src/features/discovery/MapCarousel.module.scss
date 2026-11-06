@@ -1,0 +1,128 @@
+@use "mixins" as *;
+
+.rail {
+  position: absolute;
+  left: 0;
+  right: 72px;
+  bottom: 16px;
+  z-index: 12;
+  display: flex;
+  gap: 10px;
+  padding: 4px 16px 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  @include mobile {
+    right: 0;
+    bottom: calc(var(--map-bottom-inset, 0px) - 70px);
+    padding: 4px 12px;
+  }
+}
+.item {
+  position: relative;
+  flex: none;
+  scroll-snap-align: start;
+}
+/* Vertically centred without transform (the pill animates transform on hover). */
+.locate {
+  position: absolute;
+  top: calc(50% - 13px);
+  right: 12px;
+  z-index: 1;
+}
+.card {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 270px;
+  max-width: 300px;
+  padding: 10px 14px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgb(255 254 251 / 0.97);
+  box-shadow: var(--shadow-float);
+  text-align: left;
+  transition:
+    transform 160ms var(--ease),
+    border-color 160ms var(--ease);
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+.trusted {
+  border-color: var(--gold-ring);
+}
+.selected {
+  border-color: var(--ink);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    var(--shadow-float);
+}
+.thumb {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  overflow: visible;
+  background: var(--surface-sunken);
+  color: var(--muted);
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+  }
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+.dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--live);
+  border: 2px solid #fff;
+}
+.dotReserved {
+  background: #e3a52f;
+}
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.name {
+  font-size: 16.5px;
+  line-height: 1.2;
+  @include truncate;
+}
+.meta {
+  font-size: 12px;
+  color: var(--muted);
+  @include truncate;
+}
+.pill {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fffaf3;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.card.cardWithCta {
+  padding-right: 128px;
+}

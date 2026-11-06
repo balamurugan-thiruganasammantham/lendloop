@@ -1,0 +1,35 @@
+@use "mixins" as *;
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 4px;
+    @include hairline;
+    font-weight: 550;
+    svg {
+      width: 18px;
+      height: 18px;
+      color: var(--muted);
+    }
+  }
+}
+.badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+}
+.chev {
+  margin-left: auto;
+}

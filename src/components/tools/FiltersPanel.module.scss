@@ -1,0 +1,97 @@
+@use "mixins" as *;
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  &:disabled {
+    opacity: 0.55;
+  }
+  legend {
+    @include eyebrow;
+    margin-bottom: 8px;
+    padding: 0;
+  }
+}
+.note {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-sans);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  &:hover {
+    border-color: var(--line-strong);
+  }
+}
+.on {
+  background: var(--ink) !important;
+  border-color: var(--ink) !important;
+  color: #fff !important;
+}
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+  button {
+    flex: 1;
+    min-width: 54px;
+    height: 30px;
+    border: 0;
+    background: none;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    & + button {
+      border-left: 1px solid var(--line);
+    }
+    &:hover:not(:disabled) {
+      background: var(--surface-2);
+    }
+    &:disabled {
+      color: var(--muted-2);
+      cursor: not-allowed;
+    }
+  }
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent);
+  }
+}
+.reset {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 550;
+  font-size: 13px;
+}

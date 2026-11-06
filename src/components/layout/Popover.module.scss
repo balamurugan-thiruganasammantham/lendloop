@@ -1,0 +1,31 @@
+@use "mixins" as *;
+
+.popover {
+  position: absolute;
+  z-index: 1500;
+  max-width: calc(100vw - 16px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  animation: drop 140ms var(--ease);
+}
+.below-end {
+  top: calc(100% + 8px);
+  right: 0;
+}
+.below-start {
+  top: calc(100% + 8px);
+  left: 0;
+}
+.right-end {
+  left: calc(100% + 12px);
+  bottom: 0;
+}
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

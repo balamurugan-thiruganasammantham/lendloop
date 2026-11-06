@@ -1,0 +1,86 @@
+@use "mixins" as *;
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(23 23 23 / 0.32);
+  animation: fade 160ms var(--ease);
+  @include mobile {
+    place-items: end stretch;
+    padding: 0;
+  }
+}
+.panel {
+  width: 100%;
+  max-height: min(88vh, 860px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  outline: none;
+  animation: rise 200ms var(--ease);
+  @include mobile {
+    max-height: 92vh;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+.glass {
+  @include glass;
+}
+.sm {
+  max-width: 420px;
+}
+.md {
+  max-width: 520px;
+}
+.lg {
+  max-width: 720px;
+}
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+}
+.title {
+  font-size: 17px;
+}
+.description {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.body {
+  padding: 4px 20px 18px;
+  @include scroll-y;
+}
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  @include mobile {
+    > * {
+      flex: 1;
+    }
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

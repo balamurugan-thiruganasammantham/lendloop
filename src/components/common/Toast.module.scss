@@ -1,0 +1,71 @@
+@use "mixins" as *;
+
+.region {
+  position: fixed;
+  z-index: 3000;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+  @include mobile {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom));
+  }
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+  font-size: 13.5px;
+  line-height: 1.4;
+  animation: in 200ms var(--ease);
+  > svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    margin-top: 1px;
+  }
+  > span {
+    flex: 1;
+  }
+  button {
+    background: none;
+    border: 0;
+    color: rgb(255 255 255 / 0.6);
+    padding: 0;
+    display: grid;
+    &:hover {
+      color: #fff;
+    }
+    svg {
+      width: 15px;
+      height: 15px;
+    }
+  }
+}
+.success > svg {
+  color: #8fd3a8;
+}
+.error > svg {
+  color: #f2a196;
+}
+.info > svg {
+  color: #9cc2ea;
+}
+@keyframes in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

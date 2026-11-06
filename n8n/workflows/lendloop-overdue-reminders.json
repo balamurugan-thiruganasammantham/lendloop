@@ -1,0 +1,835 @@
+{
+  "id": "lendloopOverdueR",
+  "name": "LendLoop - Daily Overdue Reminders",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## LendLoop - Daily Overdue Reminders\nRuns daily at 09:00 UTC (or manually).\n1. Fetch overdue candidates from Convex\n2. Per loan: claim reminder - only `claimed` is emailed (SMTP or MOCKED); everything else is skipped\n3. Report each reminder, then record run counts at /automation/runs (also for empty runs)\n\nRe-running the same day is safe: Convex returns `duplicate` for reminders already sent.",
+        "height": 260,
+        "width": 520
+      },
+      "id": "6ca8ce61-8adc-486f-ad6f-d31e2f6336bf",
+      "name": "About",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "32240be0-88e7-479a-a084-ff692f5e3b58",
+      "name": "Daily 09:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "4414aa9a-3e7c-4a01-a922-abcefde72c4b",
+      "name": "Run Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Signed request helper (identical scheme to Convex convex/lib/crypto.ts) ---\n// signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_AUTOMATION_SECRET, `${timestamp}.${nonce}.${body}`))\n// `body` is the exact string the next HTTP Request node sends as its raw body.\nconst crypto = require('crypto');\nfunction signedRequest(path, payload) {\n  const secret = $env.LENDLOOP_AUTOMATION_SECRET;\n  const base = String($env.LENDLOOP_CONVEX_SITE_URL || '').trim().replace(/\\/+$/, '');\n  if (typeof secret !== 'string' || secret.length < 32) throw new Error('LENDLOOP_AUTOMATION_SECRET is not configured');\n  if (!/^https?:\\/\\/\\S+$/.test(base)) throw new Error('LENDLOOP_CONVEX_SITE_URL is not configured');\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${body}`).digest('hex');\n  return { url: base + path, body, timestamp, nonce, signature };\n}\n// -----------------------------------------------------------------------------\n// Ask Convex which loans are overdue and still need today's reminder.\n// Convex picks the period (UTC date) itself; optional body fields: period \"YYYY-MM-DD\", limit 1-200.\nconst startedAt = Date.now();\nconst request = signedRequest('/automation/overdue/candidates', { executionId: String($execution.id) });\nreturn [{ json: { startedAt, request } }];"
+      },
+      "id": "07ac193d-a41f-45d6-aeef-409cc54ffdb2",
+      "name": "Request Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.request.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.request.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-nonce",
+              "value": "={{ $json.request.nonce }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.request.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.request.body }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "7d2a2009-a2a4-42aa-a0f5-056a349c2c63",
+      "name": "Fetch Overdue Candidates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per candidate loan. With no candidates, a single marker item goes straight\n// to \"Summarize Run\" so an empty run is still reported to Convex.\nconst res = $input.first().json;\nconst period = res.period;\nif (typeof period !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(period)) {\n  throw new Error('Unexpected /automation/overdue/candidates response: missing period');\n}\nif (!Array.isArray(res.items)) throw new Error('Unexpected /automation/overdue/candidates response: missing items');\n\nconst seen = new Set();\nconst items = [];\nfor (const c of res.items) {\n  if (!c || typeof c.loanId !== 'string' || !/^[A-Za-z0-9]{1,64}$/.test(c.loanId) || seen.has(c.loanId)) continue;\n  seen.add(c.loanId);\n  items.push({ json: { loanId: c.loanId, period, daysOverdue: Number.isInteger(c.daysOverdue) ? c.daysOverdue : null } });\n}\nreturn items.length > 0 ? items : [{ json: { noCandidates: true, period } }];"
+      },
+      "id": "a1de0cf2-d74d-4f1f-a8d0-2c9dbc1254ad",
+      "name": "Split Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5b4ad1d1-c089-4da8-a32f-d864f9dd245e",
+              "leftValue": "={{ $json.loanId ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e3ab6286-0e95-4b09-a061-5f6b1d29b3ec",
+      "name": "Has Candidates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "43936ed6-bcfd-418f-a966-3076b487c7d5",
+      "name": "Loop Over Candidates",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Signed request helper (identical scheme to Convex convex/lib/crypto.ts) ---\n// signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_AUTOMATION_SECRET, `${timestamp}.${nonce}.${body}`))\n// `body` is the exact string the next HTTP Request node sends as its raw body.\nconst crypto = require('crypto');\nfunction signedRequest(path, payload) {\n  const secret = $env.LENDLOOP_AUTOMATION_SECRET;\n  const base = String($env.LENDLOOP_CONVEX_SITE_URL || '').trim().replace(/\\/+$/, '');\n  if (typeof secret !== 'string' || secret.length < 32) throw new Error('LENDLOOP_AUTOMATION_SECRET is not configured');\n  if (!/^https?:\\/\\/\\S+$/.test(base)) throw new Error('LENDLOOP_CONVEX_SITE_URL is not configured');\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${body}`).digest('hex');\n  return { url: base + path, body, timestamp, nonce, signature };\n}\n// -----------------------------------------------------------------------------\n// Idempotency: Convex only answers \"claimed\" once per loan per period.\nconst { loanId, period } = $input.first().json;\nconst request = signedRequest('/automation/reminders/claim', { loanId, period, executionId: String($execution.id) });\nreturn [{ json: { loanId, period, request } }];"
+      },
+      "id": "ce9ce200-8c34-4206-a5a9-3d8966411a3b",
+      "name": "Sign Claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.request.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.request.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-nonce",
+              "value": "={{ $json.request.nonce }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.request.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.request.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "9e84f38a-ab91-4f4a-aabc-87f13bfaa1ed",
+      "name": "Claim Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7fb4d666-b82c-490e-a462-fd6d1b285283",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "claimed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "112b0b03-80a1-4b9d-a8c8-41fd122acb36",
+      "name": "Claimed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convex did not hand out this reminder (duplicate / in_progress / not_overdue / skipped / unknown).\nconst { loanId } = $('Loop Over Candidates').first().json;\nconst status = String($input.first().json.status ?? 'unknown').slice(0, 30);\nreturn [{ json: { loanId, outcome: 'SKIPPED', status } }];"
+      },
+      "id": "4902aef7-94ae-473d-a1f7-c01fd740cd65",
+      "name": "Outcome: Skipped",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the reminder from the text Convex returned with the claim (no other data).\nconst r = $input.first().json;\nconst mode = String($env.LENDLOOP_EMAIL_MODE || 'mock').trim().toLowerCase() === 'smtp' ? 'smtp' : 'mock';\nconst subject = String(r.message?.subject ?? 'LendLoop reminder').replace(/[\\r\\n]+/g, ' ').slice(0, 200);\nconst text = `${String(r.message?.body ?? '')}\\n\\n${String(r.link ?? '')}`.trim();\nreturn [{ json: { mode, email: { to: String(r.recipient?.email ?? ''), subject, text } } }];"
+      },
+      "id": "2dde866a-ebbd-48f0-ad37-2d0223fe231f",
+      "name": "Build Reminder Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6732f6ba-2334-4a16-ab2d-b28b8c27db11",
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "smtp",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5acd4119-13c8-4643-a19f-ec401988a207",
+      "name": "SMTP Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.LENDLOOP_EMAIL_FROM }}",
+        "toEmail": "={{ $json.email.to }}",
+        "subject": "={{ $json.email.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.email.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "93c0d59e-56ec-4510-a7f9-d93fbf5bdf8b",
+      "name": "Send Reminder (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2420,
+        -240
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "lendloopSmtpCred",
+          "name": "LendLoop SMTP"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Redaction helper: never forward emails, signatures, secrets or OTP-like numbers ---\nfunction redact(text, max = 1000) {\n  let s = String(text ?? '');\n  for (const name of ['LENDLOOP_AUTOMATION_SECRET', 'LENDLOOP_N8N_WEBHOOK_SECRET']) {\n    const v = $env[name];\n    if (typeof v === 'string' && v.length >= 16) s = s.split(v).join('[redacted]');\n  }\n  return s\n    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, '[email]')\n    .replace(/\\b(bearer|basic)\\s+[A-Za-z0-9._~+/=-]+/gi, '$1 [redacted]')\n    .replace(/sha256=[A-Fa-f0-9]+/g, 'sha256=[redacted]')\n    .replace(/\\b(password|passwd|pass|secret|token|api[_-]?key|authorization)([\"']?\\s*[:=]\\s*[\"']?)[^\\s\"',;&}]+/gi, '$1$2[redacted]')\n    .replace(/\\b\\d{6,}\\b/g, '[number]')\n    .slice(0, max);\n}\n// -----------------------------------------------------------------------------\n// \"Send Email\" runs with On Error = continue. Only report SENT on positive evidence from the\n// SMTP server: if the node failed before sending (e.g. missing credential) n8n passes the\n// input item through unchanged, without an `error` field.\nconst out = $input.first().json;\nconst fail = (why) => [{ json: { result: 'FAILED', error: redact(`SMTP send failed: ${why}`) } }];\nif (out.error) {\n  const e = out.error;\n  return fail(typeof e === 'string' ? e : (e.message || e.description || 'unknown error'));\n}\nif (Array.isArray(out.rejected) && out.rejected.length > 0) return fail('recipient rejected by the SMTP server');\nconst accepted = Array.isArray(out.accepted) && out.accepted.length > 0;\nif (!accepted && typeof out.messageId !== 'string') {\n  return fail('the Send Email node returned no SMTP result - check that the \"LendLoop SMTP\" credential exists and is selected');\n}\nreturn [{ json: { result: 'SENT' } }];"
+      },
+      "id": "70a2a020-4735-4b8c-af27-610c2e0fe54e",
+      "name": "SMTP Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// LENDLOOP_EMAIL_MODE is not \"smtp\": no email is sent, the delivery is reported as MOCKED.\nreturn [{ json: { result: 'MOCKED' } }];"
+      },
+      "id": "80b209bb-f65d-4749-a13d-87757b40f38d",
+      "name": "Mock Send (No Email)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Signed request helper (identical scheme to Convex convex/lib/crypto.ts) ---\n// signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_AUTOMATION_SECRET, `${timestamp}.${nonce}.${body}`))\n// `body` is the exact string the next HTTP Request node sends as its raw body.\nconst crypto = require('crypto');\nfunction signedRequest(path, payload) {\n  const secret = $env.LENDLOOP_AUTOMATION_SECRET;\n  const base = String($env.LENDLOOP_CONVEX_SITE_URL || '').trim().replace(/\\/+$/, '');\n  if (typeof secret !== 'string' || secret.length < 32) throw new Error('LENDLOOP_AUTOMATION_SECRET is not configured');\n  if (!/^https?:\\/\\/\\S+$/.test(base)) throw new Error('LENDLOOP_CONVEX_SITE_URL is not configured');\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${body}`).digest('hex');\n  return { url: base + path, body, timestamp, nonce, signature };\n}\n// -----------------------------------------------------------------------------\n// Record the reminder outcome for this loan/period.\nconst { loanId, period } = $('Loop Over Candidates').first().json;\nconst { result, error } = $input.first().json;\nconst payload = { loanId, period, result };\nif (result === 'FAILED') payload.error = String(error || 'Email delivery failed').slice(0, 1000);\nreturn [{ json: { loanId, result, request: signedRequest('/automation/reminders/report', payload) } }];"
+      },
+      "id": "db497b83-5cc1-4c26-aab1-062370b4cfff",
+      "name": "Sign Reminder Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.request.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.request.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-nonce",
+              "value": "={{ $json.request.nonce }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.request.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.request.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "460a2c70-2640-42a2-aa89-09796f7f1f4d",
+      "name": "Report Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        -100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reminder handled and reported: SENT, MOCKED or FAILED (SMTP error).\nconst { loanId, result } = $('Sign Reminder Report').first().json;\nreturn [{ json: { loanId, outcome: result } }];"
+      },
+      "id": "afd70189-2693-43e6-ad0f-e53892d8d0d0",
+      "name": "Outcome: Reported",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Redaction helper: never forward emails, signatures, secrets or OTP-like numbers ---\nfunction redact(text, max = 1000) {\n  let s = String(text ?? '');\n  for (const name of ['LENDLOOP_AUTOMATION_SECRET', 'LENDLOOP_N8N_WEBHOOK_SECRET']) {\n    const v = $env[name];\n    if (typeof v === 'string' && v.length >= 16) s = s.split(v).join('[redacted]');\n  }\n  return s\n    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, '[email]')\n    .replace(/\\b(bearer|basic)\\s+[A-Za-z0-9._~+/=-]+/gi, '$1 [redacted]')\n    .replace(/sha256=[A-Fa-f0-9]+/g, 'sha256=[redacted]')\n    .replace(/\\b(password|passwd|pass|secret|token|api[_-]?key|authorization)([\"']?\\s*[:=]\\s*[\"']?)[^\\s\"',;&}]+/gi, '$1$2[redacted]')\n    .replace(/\\b\\d{6,}\\b/g, '[number]')\n    .slice(0, max);\n}\n// -----------------------------------------------------------------------------\n// A Convex call for this loan failed after retries. Count it and continue with the next loan.\nconst { loanId } = $('Loop Over Candidates').first().json;\nconst e = $input.first().json.error;\nconst message = typeof e === 'string' ? e : (e?.message || 'request failed');\nreturn [{ json: { loanId, outcome: 'FAILED', stage: $prevNode.name, error: redact(message, 300) } }];"
+      },
+      "id": "69f16182-a34c-4f9b-a3f7-81c63cadf875",
+      "name": "Outcome: Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Signed request helper (identical scheme to Convex convex/lib/crypto.ts) ---\n// signature = \"sha256=\" + hex(HMAC_SHA256(LENDLOOP_AUTOMATION_SECRET, `${timestamp}.${nonce}.${body}`))\n// `body` is the exact string the next HTTP Request node sends as its raw body.\nconst crypto = require('crypto');\nfunction signedRequest(path, payload) {\n  const secret = $env.LENDLOOP_AUTOMATION_SECRET;\n  const base = String($env.LENDLOOP_CONVEX_SITE_URL || '').trim().replace(/\\/+$/, '');\n  if (typeof secret !== 'string' || secret.length < 32) throw new Error('LENDLOOP_AUTOMATION_SECRET is not configured');\n  if (!/^https?:\\/\\/\\S+$/.test(base)) throw new Error('LENDLOOP_CONVEX_SITE_URL is not configured');\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${body}`).digest('hex');\n  return { url: base + path, body, timestamp, nonce, signature };\n}\n// -----------------------------------------------------------------------------\n// Aggregate per-loan outcomes (or the \"no candidates\" marker) and report the run.\nconst outcomes = $input.all().map((i) => i.json).filter((j) => typeof j.outcome === 'string');\nconst count = (...values) => outcomes.filter((o) => values.includes(o.outcome)).length;\nconst summary = {\n  workflowName: 'lendloop-overdue-reminders',\n  executionId: String($execution.id),\n  processed: outcomes.length,\n  sent: count('SENT', 'MOCKED'),\n  skipped: count('SKIPPED'),\n  failed: count('FAILED'),\n  startedAt: $('Request Candidates').first().json.startedAt,\n};\nreturn [{ json: { summary, request: signedRequest('/automation/runs', summary) } }];"
+      },
+      "id": "587960e1-9dd0-47c5-abba-7ebdd7761601",
+      "name": "Summarize Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.request.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.request.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-nonce",
+              "value": "={{ $json.request.nonce }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.request.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.request.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "539bc382-2067-4194-ab6d-51fbac3c24f9",
+      "name": "Record Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        520
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final output (shown by `n8n execute`): the counts that were recorded in Convex.\nconst { summary } = $('Summarize Run').first().json;\nreturn [{ json: { recorded: $input.first().json.ok === true, ...summary } }];"
+      },
+      "id": "aaf4fd8e-977b-4787-a948-920cc0743e03",
+      "name": "Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 09:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "Request Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Manually": {
+      "main": [
+        [
+          {
+            "node": "Request Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Candidates": {
+      "main": [
+        [
+          {
+            "node": "Fetch Overdue Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Overdue Candidates": {
+      "main": [
+        [
+          {
+            "node": "Split Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Candidates": {
+      "main": [
+        [
+          {
+            "node": "Has Candidates?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Candidates?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Summarize Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Candidates": {
+      "main": [
+        [
+          {
+            "node": "Summarize Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sign Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Claim": {
+      "main": [
+        [
+          {
+            "node": "Claim Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Reminder": {
+      "main": [
+        [
+          {
+            "node": "Claimed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome: Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claimed?": {
+      "main": [
+        [
+          {
+            "node": "Build Reminder Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome: Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reminder Email": {
+      "main": [
+        [
+          {
+            "node": "SMTP Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMTP Mode?": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mock Send (No Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reminder (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "SMTP Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMTP Result": {
+      "main": [
+        [
+          {
+            "node": "Sign Reminder Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Send (No Email)": {
+      "main": [
+        [
+          {
+            "node": "Sign Reminder Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Reminder Report": {
+      "main": [
+        [
+          {
+            "node": "Report Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Reminder": {
+      "main": [
+        [
+          {
+            "node": "Outcome: Reported",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome: Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outcome: Reported": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outcome: Skipped": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outcome: Failed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Run": {
+      "main": [
+        [
+          {
+            "node": "Record Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Run": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "lendloopErrorHdl",
+    "executionTimeout": 1800
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

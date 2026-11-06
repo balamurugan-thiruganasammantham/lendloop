@@ -1,0 +1,28 @@
+// MapLibre chrome overrides. Marker content uses CSS modules (ToolPins etc.).
+@use "mixins" as *;
+
+.maplibregl-map,
+.mapboxgl-map {
+  font-family: var(--font-sans);
+}
+
+.maplibregl-ctrl-attrib,
+.mapboxgl-ctrl-attrib {
+  font-size: 10.5px;
+  background: rgb(255 254 251 / 0.85) !important;
+  border-radius: 10px !important;
+  a {
+    color: var(--ink-2) !important;
+  }
+}
+.maplibregl-ctrl-bottom-right,
+.mapboxgl-ctrl-bottom-right,
+.mapboxgl-ctrl-bottom-left {
+  @include mobile {
+    bottom: var(--map-bottom-inset, 0px);
+  }
+}
+
+.ll-marker-host {
+  cursor: pointer;
+}

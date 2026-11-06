@@ -1,0 +1,80 @@
+/* The marker is anchored on the dot's centre; the label hangs to its right. */
+.wrap {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+
+.dot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: 50%;
+  background: #2f6fd0;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -16px;
+    border-radius: 50%;
+    background: rgb(47 111 208 / 0.24);
+    animation: pulse 2.4s var(--ease) infinite;
+  }
+}
+.manual {
+  background: var(--ink);
+  &::before {
+    background: rgb(31 27 22 / 0.1);
+    animation: none;
+  }
+}
+
+.label {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 9px);
+  transform: translateY(-50%);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #2f6fd0;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgb(31 27 22 / 0.22);
+  &::before {
+    /* Small notch pointing at the dot */
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    background: inherit;
+    transform: translateY(-50%) rotate(45deg);
+    border-radius: 1px;
+  }
+}
+.labelManual {
+  background: var(--ink);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot::before {
+    animation: none;
+  }
+}

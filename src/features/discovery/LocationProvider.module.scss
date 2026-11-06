@@ -1,0 +1,36 @@
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  strong {
+    color: var(--ink);
+  }
+  em {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--ink);
+  }
+}
+.hint {
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.search {
+  margin-top: 14px;
+}
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fffaf3;
+  font-weight: 600;
+  font-size: 14px;
+}
