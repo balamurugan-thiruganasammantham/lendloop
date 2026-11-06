@@ -120,6 +120,7 @@ These values were shared in plain text during setup. Replace them, then update t
 3. Render → https://dashboard.render.com/web/srv-dbmq1r0m7kps73c2564g → **Environment** → edit:
    `DB_POSTGRESDB_HOST`, `DB_POSTGRESDB_DATABASE`, `DB_POSTGRESDB_USER`, `DB_POSTGRESDB_PASSWORD` (Neon values), and **add** `DB_POSTGRESDB_SSL_ENABLED` = `true` → **Save, rebuild, and deploy**.
 4. *Expect:* the first start on the empty database takes ~5 minutes (migrations + workflow import), then the logs show "n8n ready on 0.0.0.0, port 5678".
+   The very first boot on a new database also does one-time setup that needs more memory than the normal 256 MB heap cap. If the log shows `JavaScript heap out of memory` on that first boot, add `LENDLOOP_N8N_HEAP_MB` = `400` in **Environment**, let it start once (look for "Instance registered"), then **delete** the variable so later starts use the safe default.
 5. Open https://looplend-n8n.onrender.com → n8n asks you to **set up the owner account** again (new database) → do it immediately.
 6. Delete the old Render database: https://dashboard.render.com/d/dpg-dbmq10jrjlhs73c6nes0-a → **Settings** → **Delete Database**.
 
@@ -156,6 +157,8 @@ These values were shared in plain text during setup. Replace them, then update t
 | `Postgres 16 is outside the supported range…` | Works ("compatibility support"); Neon (section 4) uses PostgreSQL 17 | Fixed by the move in section 4 |
 | `Database ping failed (1/3)` once | A slow ping while the CPU is busy; it recovers | Ignore unless it reaches 3/3 |
 | `Port scan timeout reached` followed by restarts | n8n never opened its port | Check `N8N_LISTEN_ADDRESS=0.0.0.0` and the database variables |
+| `n8n ready …` then, ~1 minute later, the start-up lines again (no error) | The container was killed for using more than Render Free's **512 MB** | The image caps n8n's heap at 256 MB (`LENDLOOP_N8N_HEAP_MB`) and the code runner at 96 MB (`N8N_RUNNERS_MAX_OLD_SPACE_SIZE`). Don't raise them on the free plan. |
+| `FATAL ERROR: … JavaScript heap out of memory` | The heap cap is too small for the work n8n is doing | Raise `LENDLOOP_N8N_HEAP_MB` a little (e.g. 288) only if memory allows; otherwise a paid instance |
 
 ---
 

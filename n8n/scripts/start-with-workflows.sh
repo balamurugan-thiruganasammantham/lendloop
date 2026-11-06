@@ -20,6 +20,9 @@ if [ "$use_marker" = true ] && [ "${LENDLOOP_FORCE_IMPORT:-false}" != true ] && 
   echo "LendLoop workflows unchanged ($hash): skipping import."
 else
   echo "Importing LendLoop workflows ($hash)…"
+  # Inside a 512 MB container Node defaults to ~256 MB of heap, too little for
+  # first-time migrations; the import runs alone, so it may use more.
+  export NODE_OPTIONS="--max-old-space-size=${LENDLOOP_IMPORT_HEAP_MB:-400}"
   n8n import:workflow --separate --input=/workflows
   # Publishing via the CLI takes effect when n8n starts, which happens right after.
   for id in lendloopErrorHdl lendloopReqNotif lendloopOverdueR; do
@@ -27,5 +30,11 @@ else
   done
   if [ "$use_marker" = true ]; then node /workflow-marker.cjs set "$hash" || true; fi
 fi
+
+# Render Free has 512 MB of RAM. Uncapped, n8n settles around 560 MB and gets
+# killed; capping the V8 heaps keeps it near 430 MB (peak ~480 MB). Only the
+# long-running server is capped: the one-off import above needs more headroom.
+export N8N_RUNNERS_MAX_OLD_SPACE_SIZE="${N8N_RUNNERS_MAX_OLD_SPACE_SIZE:-96}"
+export NODE_OPTIONS="--max-old-space-size=${LENDLOOP_N8N_HEAP_MB:-256}"
 
 exec /docker-entrypoint.sh "$@"
