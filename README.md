@@ -314,6 +314,16 @@ stateDiagram-v2
 - The profile "approximate location" is coarsened to about 1 km on the server.
 - **Photo uploads are re-encoded client-side** to strip EXIF/GPS metadata before upload.
 - The landing page shows no owner identity, descriptions or exact data.
+
+### Data-minimisation decisions (and where we deliberately show more)
+
+| What | Shown to | Why |
+| --- | --- | --- |
+| **Public page:** tool name, category, availability **plus** photo, condition, neighbourhood name and a fuzzed (~500 m) map position | Anyone | The brief asks for "name and category only, no owner details". We keep **no owner details** and no descriptions/exact data, but show photo, condition and an approximate area because they decide whether a visitor signs up, and none of them identifies a person. Positions are snapped and jittered server-side (`approximateLocation`). Narrowing `tools.publicPreview` to name + category is a one-line change if a stricter reading is preferred. |
+| **Borrower on an incoming request:** first name + last initial, avatar, verified history counts (borrowed, returned, late, damage confirmed) and published feedback | The tool's owner, before approving | The owner is lending a valuable item to a stranger; system-verified history is the trust signal that makes approving practical. No email, phone or location is shown, and the counts come from completed loans, not self-description. |
+| **Exact pickup point and address** | Approved borrower of that loan (and the owner/admins) | Needed only to collect the tool; stored in a separate table and returned only by `loans.get` while the loan is live. |
+| **n8n payloads** | n8n | Only what the message needs: recipient id, email and display name; event type; request/loan/tool ids, tool name and status; a short title/body; a deep link. No hand-over codes, pickup addresses, coordinates or tool descriptions. |
+| **Automation activity on a loan** ("Lender notified · request approved · Email sent · 2 min ago") | That loan's owner, borrower and admins | Delivery facts only (type, status, time); no addresses, payloads or error text. `loans.automationActivity`. |
 - Security headers include `Permissions-Policy: geolocation=(self)`.
 
 ## 10. n8n integration
@@ -525,6 +535,7 @@ CAPTURE_SCREENSHOTS=1 npx playwright test tests/e2e/screenshots.spec.ts   # rege
   9. The borrower is blocked from `/admin` and a stranger is redirected away from the loan.
   10. The listing is deleted to clean up.
 - `public.spec.ts` checks that the landing page is free of private data and that signed-out visitors are redirected.
+- Run the same suite against a deployed site with `E2E_BASE_URL=https://lendloopapp.vercel.app npm run test:e2e` (no local server is started). It creates the two `+clerk_test` members and a temporary listing in that deployment, and deletes the listing at the end.
 - The "sign up" step creates users through Clerk's Backend API and then signs in with a ticket; it does not drive the Clerk sign-up form.
 
 ## 18. Deployment

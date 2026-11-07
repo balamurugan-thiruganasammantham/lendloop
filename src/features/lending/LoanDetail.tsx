@@ -25,6 +25,7 @@ import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatRange, relativeTime } from "@/lib/format";
 import { AUDIT_ACTION_LABELS, LOAN_STATUS_META } from "@/lib/status";
 import { ShowCodePanel, VerifyCodePanel } from "./CodePanels";
+import { AutomationActivity } from "./AutomationActivity";
 import styles from "./LoanDetail.module.scss";
 import { PickupCard } from "./PickupCard";
 import { DamageDialog, DamageResponse, NotReturnedDialog, ReturnForm } from "./ReturnPanels";
@@ -136,7 +137,8 @@ export function LoanDetail({ loanId }: { loanId: Id<"loans"> }) {
           )}
           {loan.status === "DISPUTED" && (
             <InlineAlert tone="danger">
-              Under admin review{loan.disputeReason ? `: “${loan.disputeReason}”` : "."} {isOwner && "If the tool comes back, you can still verify the return below."}
+              Under admin review{loan.disputeReason ? `: “${loan.disputeReason}”` : "."}{" "}
+              {isOwner && "If the tool comes back, you can still verify the return below."}
             </InlineAlert>
           )}
           {loan.disputeOutcome && loan.status !== "DISPUTED" && (
@@ -147,8 +149,12 @@ export function LoanDetail({ loanId }: { loanId: Id<"loans"> }) {
           )}
 
           {/* Collection */}
-          {isBorrower && can("GET_PICKUP_CODE") && <ShowCodePanel loanId={loanId} purpose="COLLECTION" ownerName={counterpartName} meta={loan.otp.collection} />}
-          {isOwner && can("VERIFY_PICKUP") && <VerifyCodePanel loanId={loanId} purpose="COLLECTION" borrowerName={counterpartName} meta={loan.otp.collection} />}
+          {isBorrower && can("GET_PICKUP_CODE") && (
+            <ShowCodePanel loanId={loanId} purpose="COLLECTION" ownerName={counterpartName} meta={loan.otp.collection} />
+          )}
+          {isOwner && can("VERIFY_PICKUP") && (
+            <VerifyCodePanel loanId={loanId} purpose="COLLECTION" borrowerName={counterpartName} meta={loan.otp.collection} />
+          )}
 
           {/* In use */}
           {isBorrower && can("REQUEST_RETURN") && <ReturnForm loanId={loanId} ownerName={counterpartName} />}
@@ -156,9 +162,7 @@ export function LoanDetail({ loanId }: { loanId: Id<"loans"> }) {
             <div className={styles.actionCard}>
               <div>
                 <h3>With {counterpartName}</h3>
-                <p>
-                  Due back {formatDateTime(loan.returnBy)}. You&apos;ll be notified when they start the return.
-                </p>
+                <p>Due back {formatDateTime(loan.returnBy)}. You&apos;ll be notified when they start the return.</p>
               </div>
               {can("REPORT_NOT_RETURNED") && (
                 <Button variant="danger" icon={<Flag />} onClick={() => setNotReturnedOpen(true)}>
@@ -193,7 +197,9 @@ export function LoanDetail({ loanId }: { loanId: Id<"loans"> }) {
                     <figcaption>Return photos</figcaption>
                     <div className={styles.photoRow}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {loan.returnSubmission?.photos.map((src) => <img key={src} src={src} alt="Returned tool" />)}
+                      {loan.returnSubmission?.photos.map((src) => (
+                        <img key={src} src={src} alt="Returned tool" />
+                      ))}
                     </div>
                   </figure>
                 </div>
@@ -276,7 +282,9 @@ export function LoanDetail({ loanId }: { loanId: Id<"loans"> }) {
                     {d.evidence.length > 0 && (
                       <div className={styles.photoRow}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {d.evidence.map((src) => <img key={src} src={src} alt="Damage evidence" />)}
+                        {d.evidence.map((src) => (
+                          <img key={src} src={src} alt="Damage evidence" />
+                        ))}
                       </div>
                     )}
                     {d.borrowerResponse && <blockquote className={styles.quote}>Borrower: “{d.borrowerResponse}”</blockquote>}
@@ -382,11 +390,23 @@ export function LoanDetail({ loanId }: { loanId: Id<"loans"> }) {
                   <div>
                     <p className={styles.tlTitle}>
                       {e.action === "loan.status_changed" && e.toStatus
-                        ? LOAN_STATUS_META[e.toStatus as LoanStatus]?.label ?? e.toStatus
+                        ? (LOAN_STATUS_META[e.toStatus as LoanStatus]?.label ?? e.toStatus)
                         : (AUDIT_ACTION_LABELS[e.action] ?? e.action)}
                     </p>
                     <p className={styles.tlMeta}>
-                      {e.actor === "BORROWER" ? (isBorrower ? "You" : counterpartName) : e.actor === "OWNER" ? (isOwner ? "You" : counterpartName) : e.actor === "SYSTEM" ? "LendLoop" : e.actor === "ADMIN" ? "Admin" : "—"}{" "}
+                      {e.actor === "BORROWER"
+                        ? isBorrower
+                          ? "You"
+                          : counterpartName
+                        : e.actor === "OWNER"
+                          ? isOwner
+                            ? "You"
+                            : counterpartName
+                          : e.actor === "SYSTEM"
+                            ? "LendLoop"
+                            : e.actor === "ADMIN"
+                              ? "Admin"
+                              : "—"}{" "}
                       · {formatDateTime(e.at)}
                     </p>
                   </div>
@@ -394,6 +414,7 @@ export function LoanDetail({ loanId }: { loanId: Id<"loans"> }) {
               ))}
             </ol>
           </section>
+          <AutomationActivity loanId={loanId} role={loan.role} counterpartName={counterpartName} />
         </aside>
       </div>
 

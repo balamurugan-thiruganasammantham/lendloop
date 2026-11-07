@@ -64,12 +64,7 @@ export function allowedLoanActions(
     if (s === "RETURN_REQUESTED" || s === "DAMAGE_REPORTED" || s === "DISPUTED") actions.push("CONFIRM_RETURN");
     if (s === "RETURN_VERIFICATION_PENDING") actions.push("VERIFY_RETURN");
     if (s === "RETURN_REQUESTED" || s === "RETURN_VERIFICATION_PENDING") actions.push("REPORT_DAMAGE");
-    if (
-      s === "OVERDUE" ||
-      s === "RETURN_REQUESTED" ||
-      s === "RETURN_VERIFICATION_PENDING" ||
-      (s === "ACTIVE_LOAN" && opts.now > loan.returnBy)
-    ) {
+    if (s === "OVERDUE" || s === "RETURN_REQUESTED" || s === "RETURN_VERIFICATION_PENDING" || (s === "ACTIVE_LOAN" && opts.now > loan.returnBy)) {
       actions.push("REPORT_NOT_RETURNED");
     }
     if (!isTerminalLoanStatus(s)) actions.push("SET_RETURN_ARRANGEMENT");
@@ -98,11 +93,7 @@ export const get = query({
       return null; // Indistinguishable from "not found" to avoid leaking existence.
     }
     const now = Date.now();
-    const [tool, owner, borrower] = await Promise.all([
-      ctx.db.get(loan.toolId),
-      ctx.db.get(loan.ownerId),
-      ctx.db.get(loan.borrowerId),
-    ]);
+    const [tool, owner, borrower] = await Promise.all([ctx.db.get(loan.toolId), ctx.db.get(loan.ownerId), ctx.db.get(loan.borrowerId)]);
 
     // Exact location: only for the two participants (and admins) while the loan is live.
     let pickup: { lat: number; lng: number; address: string | null } | null = null;
@@ -215,23 +206,14 @@ export const get = query({
       ),
       feedback: {
         mine: mine ? { rating: mine.rating, comment: mine.comment ?? null, tags: mine.tags, createdAt: mine.createdAt } : null,
-        theirs: theirs
-          ? { id: theirs._id, rating: theirs.rating, comment: theirs.comment ?? null, tags: theirs.tags, createdAt: theirs.createdAt }
-          : null,
+        theirs: theirs ? { id: theirs._id, rating: theirs.rating, comment: theirs.comment ?? null, tags: theirs.tags, createdAt: theirs.createdAt } : null,
       },
       timeline: timeline.map((e) => ({
         id: e._id,
         action: e.action,
         fromStatus: e.fromStatus ?? null,
         toStatus: e.toStatus ?? null,
-        actor:
-          e.actorType !== "USER"
-            ? e.actorType
-            : e.actorId === loan.borrowerId
-              ? "BORROWER"
-              : e.actorId === loan.ownerId
-                ? "OWNER"
-                : "USER",
+        actor: e.actorType !== "USER" ? e.actorType : e.actorId === loan.borrowerId ? "BORROWER" : e.actorId === loan.ownerId ? "OWNER" : "USER",
         at: e.createdAt,
       })),
       actions: allowedLoanActions(loan, role, { now, hasOpenDamageReport, feedbackGiven: mine !== null }),
@@ -579,5 +561,65 @@ export const activeCount = query({
     const viewer = await getViewer(ctx);
     if (!viewer) return 0;
     return (await viewerLoans(ctx, viewer._id, NON_TERMINAL, 20)).length;
+  },
+});
+
+/**
+ * Recent automation for one loan (n8n notification deliveries and overdue reminders), shown on
+ * the loan page. Same access rule as `get`: the loan's owner, its borrower, or an admin; anyone
+ * else gets null. Returns delivery facts only: no email addresses, payloads or error text.
+ */
+export const automationActivity = query({
+  args: { loanId: v.id("loans") },
+  handler: async (ctx, { loanId }) => {
+    const viewer = await getViewer(ctx);
+    if (!viewer) return null;
+    const loan = await ctx.db.get(loanId);
+    if (!loan) return null;
+    try {
+      loanRoleOf(viewer, loan);
+    } catch {
+      return null;
+    }
+    const [byLoan, byRequest, reminders] = await Promise.all([
+      ctx.db
+        .query("automationEvents")
+        .withIndex("by_loan", (q) => q.eq("loanId", loanId))
+        .order("desc")
+        .take(30),
+      ctx.db
+        .query("automationEvents")
+        .withIndex("by_request", (q) => q.eq("requestId", loan.requestId))
+        .order("desc")
+        .take(30),
+      ctx.db
+        .query("automationReminders")
+        .withIndex("by_loan", (q) => q.eq("loanId", loanId))
+        .order("desc")
+        .take(30),
+    ]);
+    const seen = new Set<string>();
+    const events = [...byLoan, ...byRequest].filter((e) => (seen.has(e._id) ? false : (seen.add(e._id), true)));
+    const items = [
+      ...events.map((e) => ({
+        kind: "notification" as const,
+        id: e._id as string,
+        eventType: e.eventType,
+        recipient: e.recipientId === loan.ownerId ? ("OWNER" as const) : e.recipientId === loan.borrowerId ? ("BORROWER" as const) : ("OTHER" as const),
+        status: e.status,
+        result: e.deliveryResult ?? null,
+        attempts: e.attempts,
+        at: e.deliveryReportedAt ?? e.deliveredAt ?? e.lastAttemptAt ?? e.createdAt,
+      })),
+      ...reminders.map((r) => ({
+        kind: "reminder" as const,
+        id: r._id as string,
+        period: r.period,
+        status: r.status,
+        attempts: r.attempts,
+        at: r.completedAt ?? r.claimedAt,
+      })),
+    ];
+    return items.sort((a, b) => b.at - a.at).slice(0, 20);
   },
 });

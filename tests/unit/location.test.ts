@@ -53,3 +53,12 @@ describe("live location helpers", () => {
     expect(distanceLabel(null)).toBeNull();
   });
 });
+
+describe("describePosition", () => {
+  it("is honest about network estimates and chosen places", async () => {
+    const { describePosition } = await import("@/lib/location");
+    expect(describePosition({ source: "gps", label: null, accuracy: 25 })).toMatchObject({ label: "Your location", approximate: false });
+    expect(describePosition({ source: "gps", label: null, accuracy: 24_000 })).toMatchObject({ label: "Approximate location (±24 km)", approximate: true });
+    expect(describePosition({ source: "manual", label: "Puducherry, India", accuracy: null })).toMatchObject({ label: "Puducherry", manual: true });
+  });
+});

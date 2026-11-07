@@ -3,6 +3,7 @@
 import { useMemo, type ReactNode } from "react";
 import { SEED_NEIGHBORHOOD, type ToolCategory } from "@convex/lib/constants";
 import { formatDistance, type LatLng } from "@convex/lib/geo";
+import { describePosition } from "@/lib/location";
 import { FitPoints, FlyTo } from "./camera";
 import { AccuracyCircle, RadiusRing } from "./layers";
 import { MapControls } from "./MapControls";
@@ -100,14 +101,7 @@ export default function ExploreMap(props: ExploreMapProps) {
     >
       {me && radiusKm !== null && <RadiusRing center={me.point} radiusKm={radiusKm} />}
       {me && me.accuracy !== null && me.accuracy < 1500 && <AccuracyCircle center={me.point} meters={me.accuracy} />}
-      {me && (
-        <UserDot
-          lat={me.point.lat}
-          lng={me.point.lng}
-          manual={me.source === "manual"}
-          label={me.source === "manual" ? (me.label?.split(",")[0] ?? null) : null}
-        />
-      )}
+      {me && <UserDot lat={me.point.lat} lng={me.point.lng} manual={me.source === "manual"} label={describePosition(me).label} />}
       {me && meKey && !far && <FlyTo target={{ lat: me.point.lat, lng: me.point.lng, key: meKey }} zoom={13.6} padding={padding} />}
       <FitPoints
         points={points}

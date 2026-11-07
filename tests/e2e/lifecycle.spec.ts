@@ -6,6 +6,8 @@ import { E2E_USERS } from "./users";
 const PHOTO = path.join(__dirname, "fixtures", "tool.png");
 
 test("two neighbours complete a full borrow → lend → return lifecycle", async ({ browser }) => {
+  // Two browsers through the whole flow; first visits compile pages on a dev server.
+  test.setTimeout(300_000);
   const toolName = `E2E Drill ${Date.now().toString(36)}`;
 
   // 1–2. Owner signs in (first visit → onboarding) and lists a tool.
@@ -35,7 +37,10 @@ test("two neighbours complete a full borrow → lend → return lifecycle", asyn
   await item.click();
   await expect(borrower.locator('.ll-marker-host button[aria-pressed="true"]')).toBeVisible();
   await borrower.getByRole("button", { name: "Request to borrow" }).click();
-  await borrower.getByLabel("Message to owner").fill("Putting up shelves this weekend.");
+  // Typed key by key: a dialog re-focus bug once dropped everything after the first letter.
+  const note = "Putting up shelves this weekend.";
+  await borrower.getByLabel("Message to owner").pressSequentially(note, { delay: 15 });
+  await expect(borrower.getByLabel("Message to owner")).toHaveValue(note);
   await borrower.getByRole("button", { name: "Send request" }).click();
   await expect(borrower.getByRole("dialog", { name: "Request sent" })).toBeVisible();
   await borrower.goto("/requests?tab=PENDING");
@@ -59,6 +64,9 @@ test("two neighbours complete a full borrow → lend → return lifecycle", asyn
   // 8–9. Borrower sees approval + exact pickup point and reveals the pickup code; owner verifies it.
   await borrower.goto(loanUrl);
   await expect(borrower.getByRole("heading", { name: /Pickup location/ })).toBeVisible();
+  // Bonus: automation activity for this loan (request created → owner, approved → borrower).
+  await expect(borrower.getByRole("heading", { name: "Automation" })).toBeVisible();
+  await expect(borrower.getByText(/notified · request approved/)).toBeVisible();
   await borrower.getByRole("button", { name: "Show pickup code" }).click();
   const pickupCode = await readShownCode(borrower);
   expect(pickupCode).toMatch(/^\d{6}$/);

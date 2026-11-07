@@ -109,8 +109,9 @@ function LandingView({ signedIn }: { signedIn: boolean }) {
             </p>
           )}
           <div className={styles.ctas}>
-            <Link href={signedIn ? "/explore" : "/sign-up"} className={styles.ctaPrimary}>
-              {signedIn ? "Open the map" : "Sign in to borrow"} <ArrowRight aria-hidden />
+            {/* Clerk sign-in; new visitors get an account from the same flow (sign-in-or-up). */}
+            <Link href={signedIn ? "/explore" : "/sign-in"} className={styles.ctaPrimary}>
+              {signedIn ? "Open the map" : "Sign in to lend or borrow"} <ArrowRight aria-hidden />
             </Link>
             <Link href={signedIn ? "/listings/new" : "/sign-up"} className={styles.ctaSecondary}>
               Lend a tool
@@ -236,6 +237,7 @@ function LandingView({ signedIn }: { signedIn: boolean }) {
                   point: location.state.point,
                   manual: location.state.source === "manual",
                   label: location.state.label,
+                  accuracy: location.state.accuracy,
                 }
               : null
           }

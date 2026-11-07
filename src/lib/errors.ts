@@ -24,14 +24,28 @@ const FALLBACKS: Record<string, string> = {
  * ConvexError payloads (which the backend writes for users) are surfaced
  * verbatim; unexpected errors never leak internal details.
  */
+/** Payload of a ConvexError. Matched by shape too: errors re-thrown from actions aren't always `instanceof` the client's class. */
+function convexErrorData(error: unknown): Record<string, unknown> | null {
+  if (!(error instanceof ConvexError) && !(typeof error === "object" && error !== null && "data" in error)) return null;
+  let data: unknown = (error as { data: unknown }).data;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  return typeof data === "object" && data !== null && typeof (data as { code?: unknown }).code === "string" ? (data as Record<string, unknown>) : null;
+}
+
 export function toClientError(error: unknown): ClientError {
-  if (error instanceof ConvexError) {
-    const data = (typeof error.data === "object" && error.data !== null ? error.data : {}) as Record<string, unknown>;
+  const data = convexErrorData(error);
+  if (data) {
     const code = typeof data.code === "string" ? data.code : "UNKNOWN";
     const message = typeof data.message === "string" ? data.message : (FALLBACKS[code] ?? FALLBACKS.UNKNOWN!);
     return { code, message, retryable: code === "RATE_LIMITED", data };
   }
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return { code: "NETWORK", message: FALLBACKS.NETWORK!, retryable: true, data: {} };
   }
   if (error instanceof TypeError && /fetch|network/i.test(error.message)) {

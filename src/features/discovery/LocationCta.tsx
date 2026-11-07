@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { LocateFixed, LocateOff, Navigation } from "lucide-react";
 import type { MouseEvent } from "react";
 import { Spinner } from "@/components/common/Spinner";
+import { APPROXIMATE_ACCURACY_M } from "@/lib/location";
 import { useLocation } from "./LocationProvider";
 import styles from "./LocationCta.module.scss";
 
@@ -59,6 +60,16 @@ export function LocationBanner() {
   }
   if (state.status === "ready") {
     if (state.source === "gps") {
+      if (state.accuracy !== null && state.accuracy > APPROXIMATE_ACCURACY_M) {
+        // Desktop browsers without Wi-Fi positioning fall back to an IP estimate (often the ISP's city).
+        return (
+          <p className={styles.status}>
+            <span className={clsx(styles.liveDot, styles.liveDotPaused)} aria-hidden />
+            Approximate location <span className="num">(±{Math.round(state.accuracy / 1000)} km)</span>
+            <span className={styles.muted}> · your browser estimated it from your network. Not right? Search your area to set it.</span>
+          </p>
+        );
+      }
       return (
         <p className={styles.status}>
           <span className={clsx(styles.liveDot, !live && styles.liveDotPaused)} aria-hidden />

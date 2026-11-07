@@ -302,7 +302,8 @@ export default defineSchema({
   })
     .index("by_event_id", ["eventId"])
     .index("by_status", ["status"])
-    .index("by_loan", ["loanId"]),
+    .index("by_loan", ["loanId"])
+    .index("by_request", ["requestId"]),
 
   /** Idempotency ledger for overdue reminders: one per loan per period. */
   automationReminders: defineTable({

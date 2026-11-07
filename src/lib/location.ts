@@ -46,3 +46,22 @@ export function sortByDistance<T extends { distanceKm: number | null }>(items: T
 export function distanceLabel(km: number | null | undefined): string | null {
   return km === null || km === undefined ? null : formatDistance(km);
 }
+
+/** Beyond this the fix is a network/IP estimate (often the ISP's city), not a real position. */
+export const APPROXIMATE_ACCURACY_M = 2000;
+
+export interface PositionLike {
+  source: "gps" | "manual";
+  label: string | null;
+  accuracy: number | null;
+}
+
+/** Marker label and wording for the viewer's position, honest about rough estimates. */
+export function describePosition(me: PositionLike): { label: string; approximate: boolean; manual: boolean } {
+  if (me.source === "manual") return { label: me.label?.split(",")[0]?.trim() || "Selected place", approximate: false, manual: true };
+  if (me.accuracy !== null && me.accuracy > APPROXIMATE_ACCURACY_M) {
+    const km = Math.round(me.accuracy / 1000);
+    return { label: `Approximate location (±${km} km)`, approximate: true, manual: false };
+  }
+  return { label: "Your location", approximate: false, manual: false };
+}

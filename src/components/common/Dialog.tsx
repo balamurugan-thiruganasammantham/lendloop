@@ -24,7 +24,17 @@ export function Dialog({ open, onClose, title, description, children, footer, si
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<Element | null>(null);
+  // Latest callbacks, read by the listeners below. Keeping them out of the effect's dependencies
+  // matters: parents often pass a new `onClose` on every render (e.g. a form re-rendering per
+  // keystroke), and re-running the effect would move focus back to the first field each time.
+  const onCloseRef = useRef(onClose);
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    busyRef.current = busy;
+  });
 
+  // Runs once per opening: focus the first field, trap Tab, close on Escape, lock page scroll.
   useEffect(() => {
     if (!open) return;
     previouslyFocused.current = document.activeElement;
@@ -32,11 +42,9 @@ export function Dialog({ open, onClose, title, description, children, footer, si
     const focusable = panel?.querySelector<HTMLElement>("input, textarea, select, button:not([data-close])");
     (focusable ?? panel)?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
+      if (e.key === "Escape" && !busyRef.current) onCloseRef.current();
       if (e.key === "Tab" && panel) {
-        const items = panel.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
-        );
+        const items = panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
         if (items.length === 0) return;
         const first = items[0]!;
         const last = items[items.length - 1]!;
@@ -57,7 +65,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
       document.body.style.overflow = prevOverflow;
       (previouslyFocused.current as HTMLElement | null)?.focus?.();
     };
-  }, [open, onClose, busy]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
   return createPortal(

@@ -7,6 +7,8 @@ import { defineConfig, devices } from "@playwright/test";
  *  - E2E users (see tests/e2e/README.md); created automatically by global setup if missing.
  */
 const PORT = Number(process.env.E2E_PORT ?? 3000);
+/** Set E2E_BASE_URL (e.g. https://lendloopapp.vercel.app) to run the suite against a deployed site. */
+const REMOTE = process.env.E2E_BASE_URL;
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -18,22 +20,38 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   globalSetup: "./tests/e2e/global.setup.ts",
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: REMOTE ?? `http://localhost:${PORT}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",
     launchOptions: {
       // MapLibre needs WebGL; use SwiftShader so it renders in headless/CI browsers.
-      args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+      args: [
+        "--use-gl=angle",
+        "--use-angle=swiftshader",
+        "--enable-unsafe-swiftshader",
+      ],
       // Use the locally installed Chrome when Playwright's bundled browsers aren't installed.
-      ...(process.env.PLAYWRIGHT_CHROME_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROME_PATH } : {}),
+      ...(process.env.PLAYWRIGHT_CHROME_PATH
+        ? { executablePath: process.env.PLAYWRIGHT_CHROME_PATH }
+        : {}),
     },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
-  webServer: {
-    command: `npx next dev -p ${PORT}`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: true,
-    timeout: 180_000,
-  },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+      },
+    },
+  ],
+  webServer: REMOTE
+    ? undefined
+    : {
+        command: `npx next dev -p ${PORT}`,
+        url: `http://localhost:${PORT}`,
+        reuseExistingServer: true,
+        timeout: 180_000,
+      },
 });

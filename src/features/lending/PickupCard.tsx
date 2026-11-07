@@ -13,6 +13,7 @@ import { Button } from "@/components/common/Button";
 import { Textarea } from "@/components/common/Field";
 import { useToast } from "@/components/common/Toast";
 import { useLocation } from "@/features/discovery/LocationProvider";
+import { describePosition } from "@/lib/location";
 import { errorMessage } from "@/lib/errors";
 import { fetchRoute } from "@/services/maps";
 import styles from "./LoanDetail.module.scss";
@@ -46,6 +47,7 @@ export function PickupCard({
   const [mode, setMode] = useState<"walk" | "drive">("walk");
   const [showSteps, setShowSteps] = useState(false);
   const from: LatLng | null = role === "BORROWER" ? location.point : null;
+  const position = location.state.status === "ready" ? describePosition(location.state) : null;
   const route = useQuery({
     queryKey: ["route", mode, from?.lat.toFixed(4), from?.lng.toFixed(4), pickup.lat, pickup.lng],
     queryFn: () => fetchRoute(from!, pickup, mode),
@@ -66,8 +68,25 @@ export function PickupCard({
         <span className={styles.private}>Private to this loan</span>
       </header>
       <div className={styles.routeMap}>
-        <RouteMap pickup={pickup} from={from} path={route.data?.path ?? null} />
+        <RouteMap pickup={pickup} from={from} fromLabel={position?.label} fromManual={position?.manual} path={route.data?.path ?? null} />
       </div>
+      {role === "BORROWER" && position && (position.approximate || position.manual) && (
+        <p className={styles.positionNote} role="note">
+          {position.manual ? (
+            <>
+              Directions start from <strong>{position.label}</strong>, the place you chose.{" "}
+            </>
+          ) : (
+            <>
+              Your browser could only estimate your position from your network ({position.label.replace("Approximate location ", "")}), so the route may start
+              in the wrong place.{" "}
+            </>
+          )}
+          <button type="button" className={styles.textButton} onClick={location.requestGps}>
+            Use my live location
+          </button>
+        </p>
+      )}
       <div className={styles.cardBody}>
         {pickup.address && <p className={styles.address}>{pickup.address}</p>}
         {role === "BORROWER" && (
@@ -152,7 +171,14 @@ function ReturnArrangement({ loanId, value, editable }: { loanId: Id<"loans">; v
       </h3>
       {editing ? (
         <div className={styles.editRow}>
-          <Textarea rows={2} maxLength={1000} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Same place as pickup, any evening after 6pm." aria-label="Return arrangement" />
+          <Textarea
+            rows={2}
+            maxLength={1000}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Same place as pickup, any evening after 6pm."
+            aria-label="Return arrangement"
+          />
           <div className={styles.editActions}>
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
               Cancel

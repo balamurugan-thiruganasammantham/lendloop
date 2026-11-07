@@ -8,7 +8,7 @@ import { MapControls } from "@/components/map/MapControls";
 import MapView from "@/components/map/MapView";
 import { regionOf, ToolPins, type PinItem } from "@/components/map/ToolPins";
 import { UserDot } from "@/components/map/UserDot";
-import { distanceLabel } from "@/lib/location";
+import { describePosition, distanceLabel } from "@/lib/location";
 
 export interface PublicTool {
   id: string;
@@ -28,7 +28,7 @@ interface Props {
   hoveredId: string | null;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
-  me: { point: LatLng; manual: boolean; label: string | null } | null;
+  me: { point: LatLng; manual: boolean; label: string | null; accuracy: number | null } | null;
   onLocate: () => void;
   locating: boolean;
   /** Incremented by the locate button to fly to the visitor. */
@@ -62,7 +62,14 @@ export default function PublicMap({ tools, selectedId, hoveredId, onSelect, onHo
       <FitPoints points={points} signature={String(points.length)} padding={{ top: 70, bottom: 70, left: 70, right: 90 }} maxZoom={14.2} duration={3200} />
       <FlyTo target={selected ? { lat: selected.lat, lng: selected.lng, key: selected.id } : null} zoom={15.2} />
       <FlyTo target={meTarget} zoom={13.6} />
-      {me && <UserDot lat={me.point.lat} lng={me.point.lng} manual={me.manual} label={me.manual ? (me.label?.split(",")[0] ?? null) : null} />}
+      {me && (
+        <UserDot
+          lat={me.point.lat}
+          lng={me.point.lng}
+          manual={me.manual}
+          label={describePosition({ source: me.manual ? "manual" : "gps", label: me.label, accuracy: me.accuracy }).label}
+        />
+      )}
       <ToolPins items={pins} selectedId={selectedId} hoveredId={hoveredId} onSelect={onSelect} onHover={onHover} />
     </MapView>
   );
