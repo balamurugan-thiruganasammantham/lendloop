@@ -49,10 +49,10 @@ Setup and deployment steps are in `README.md`, `docs/CONVEX_SETUP.md`, `docs/N8N
 | --- | --- | --- | --- |
 | Browser app (React 19, Convex React client, Clerk JS, map engine) | User device | Vercel, Convex, Clerk, tile hosts, Convex storage | HTTPS; WSS to Convex with a Clerk JWT |
 | Next.js 16 App Router (`src/`) | Vercel | Clerk (session), Nominatim, OSRM | HTTPS; Clerk session cookie |
-| Convex deployment (`convex/`) | Convex cloud. Client API and WebSocket on `*.convex.cloud`; HTTP actions on `*.convex.site` | Clerk (JWT verification), SMTP (Resend), n8n | WSS + JWT; SMTP; HMAC-signed HTTP |
+| Convex deployment (`convex/`) | Convex cloud. Client API and WebSocket on `*.convex.cloud`; HTTP actions on `*.convex.site` | Clerk (JWT verification), SMTP (Gmail in the live demo), n8n | WSS + JWT; SMTP; HMAC-signed HTTP |
 | Clerk | Clerk | Browser; Convex validates its JWTs | JWT template `convex` (or Clerk's native Convex integration) |
 | n8n 2.46.6 (`n8n/Dockerfile`) | Render (Docker) | Convex HTTP actions; SMTP only when `LENDLOOP_EMAIL_MODE=smtp` | HMAC-signed HTTP in both directions |
-| Resend | Resend | — | SMTP from Convex (`convex/emailNode.ts`) and optionally from n8n |
+| Email (SMTP) | Gmail SMTP (app password) in the live demo; any SMTP provider | — | SMTP from Convex (`convex/emailNode.ts`) and optionally from n8n |
 | Nominatim and OSRM | Public servers by default | — | HTTPS, called only from Next API routes |
 | Basemap | Mapbox (when `NEXT_PUBLIC_MAPBOX_TOKEN` is set) or OpenFreeMap | — | HTTPS from the browser |
 

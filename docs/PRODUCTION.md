@@ -15,7 +15,7 @@ Values marked *(secret)* are not in this repository. Your copy of every value is
 | Automation (n8n on Render, Frankfurt, free) | **https://looplend-n8n.onrender.com** | https://dashboard.render.com/web/srv-dbmq1r0m7kps73c2564g |
 | n8n database (Render Postgres, free, **expires 2026-12-06**) | internal only | https://dashboard.render.com/d/dpg-dbmq10jrjlhs73c6nes0-a |
 | Sign-in (Clerk, **development** instance `humble-stork-7162`) | `https://humble-stork-7162.clerk.accounts.dev` | https://dashboard.clerk.com |
-| Email (Resend, free) | `smtp.resend.com:465` | https://resend.com/emails |
+| Email (Gmail SMTP with an app password, free) | `smtp.gmail.com:465`, sender `infobalamurugan22@gmail.com` | https://myaccount.google.com/apppasswords |
 | Code + CI/CD (GitHub, private) | https://github.com/balamurugan-thiruganasammantham/lendloop | Actions: https://github.com/balamurugan-thiruganasammantham/lendloop/actions |
 
 `lendloop.vercel.app`, `lend-loop.vercel.app` and `lendloop-app.vercel.app` were already taken by other Vercel users; `lendloopapp.vercel.app` was the closest free name.
@@ -27,7 +27,7 @@ Values marked *(secret)* are not in this repository. Your copy of every value is
 | Website, backend, automation, CI/CD | ✅ Production deployments | — |
 | Sign-in | ✅ Works for everyone, on Clerk's **development** keys (the "Development mode" label is hidden with Clerk's `unsafe_disableDevelopmentModeWarnings` appearance option) | Clerk production instance (no 100-user cap) |
 | Google sign-in | ✅ Works; Google's screen says "accounts.dev" | Your own app name + logo on Google's screen |
-| Hand-over code emails | ✅ Sent by Convex through Resend, **but only to your Resend account email** | Emails to every user |
+| Hand-over code emails | ✅ Sent by Convex through Gmail to **every member** (about 500/day) | A branded sender address on your own domain |
 | n8n notification emails | Recorded, not emailed (Render Free blocks SMTP) | — (needs a paid host or Oracle VM, not a domain) |
 
 ---
@@ -93,7 +93,8 @@ These values were shared in plain text during setup. Replace them, then update t
 | **GitHub token** (`ghp_…`, has admin + delete-repo rights) | Not needed by CI (it uses GitHub's built-in token). Create one only for local pushes: https://github.com/settings/personal-access-tokens/new (fine-grained, *only* this repo, Contents: read/write) | Nothing | https://github.com/settings/tokens → **Delete** |
 | **Vercel token** (`vcp_…`) | https://vercel.com/account/settings/tokens → **Create** (scope: your team) | GitHub → https://github.com/balamurugan-thiruganasammantham/lendloop/settings/secrets/actions → `VERCEL_TOKEN` → **Update** | same Vercel page → old token → **Delete** |
 | **Render API key** (`rnd_…`) | https://dashboard.render.com/u/settings#api-keys → **Create API Key** | GitHub secret `RENDER_API_KEY` | same page → **Delete** |
-| **Resend API key** (`re_…`, also the SMTP password) | https://resend.com/api-keys → **Create API Key** (Sending access) | `npx convex env set --prod SMTP_PASS <new>`; `npx convex env set SMTP_PASS <new>` (dev); your local `.env.convex.local` | same page → **Revoke** |
+| **Gmail app password** (the SMTP password) | https://myaccount.google.com/apppasswords → create a new one | `npx convex env set --prod SMTP_PASS <new>`; `npx convex env set SMTP_PASS <new>` (dev); your local `.env.convex.local` | same page → delete the old one |
+| **Resend API key** (no longer used) | — | — | https://resend.com/api-keys → **Revoke** |
 | **Clerk secret key** (`sk_test_…`) | https://dashboard.clerk.com → **Configure → API keys** → **Add new key** | Vercel → https://vercel.com/infobalamurugan22-2290s-projects/lendloop/settings/environment-variables → `CLERK_SECRET_KEY` → **Edit**; local `.env.local`; then re-run the deploy (section 5) | API keys page → old key → **Revoke** |
 
 *Expect after each change:* push to `main` (or Actions → Deploy → **Run workflow**) and the pipeline goes green.
@@ -105,7 +106,7 @@ These values were shared in plain text during setup. Replace them, then update t
 | Service | Limit | What happens / what to do |
 | --- | --- | --- |
 | Clerk development instance | Max **100 users** (the "Development mode" label is hidden in the UI, but the instance is still a development one) | Fine for a demo. Section 6 for production. |
-| Resend without a domain | Sends only **to your Resend account email**, from `onboarding@resend.dev`; 100 emails/day | Other users don't get code emails; they press **Show pickup code** on the loan page instead. |
+| Gmail SMTP | About 500 emails/day; the sender is your Gmail address | Plenty for a demo. For a branded sender, use a provider on your own domain (section 6.4). |
 | Render Free (n8n) | Sleeps after **15 min** idle (~1 min to wake); **SMTP blocked**; 750 h/month | Convex retries webhooks (≈30 s, 2 min, 10 min, 30 min, 2 h), so nothing is lost. n8n email mode stays `mock`. The 09:00 UTC overdue run only fires if n8n is awake. |
 | Render Free Postgres | **Deleted after 30 days** (expires **2026-12-06**, 14-day grace) | Before then, follow section 4. |
 | Vercel Hobby | Non-commercial use only | Upgrade to Pro before charging money or showing ads. |
@@ -191,7 +192,7 @@ Only needed to remove the Clerk development limits, show your own name/logo on G
 5. https://console.cloud.google.com/auth/audience → **Publish app** → **Confirm**.
 6. *Expect:* Google's screen says "Sign in to LendLoop" with your logo.
 
-### 6.4 Resend domain (emails to everyone)
+### 6.4 Branded email on your domain (optional)
 1. https://resend.com/domains → **Add Domain** → `lendloop.in` → add the DKIM/SPF/MX records shown → **Verify**. *Expect:* **Verified**.
 2. `npx convex env set --prod EMAIL_FROM "LendLoop <no-reply@lendloop.in>"`
 3. *Expect:* pickup/return code emails reach every borrower.

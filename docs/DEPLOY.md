@@ -380,7 +380,10 @@ A **production instance** removes those limits but needs **a domain you own** â€
 
 ---
 
-## 8. Email: what Resend Free allows
+## 8. Email: what Resend Free allows (and the Gmail alternative used live)
+
+> **Live setup (2026-11-07):** production sends through **Gmail SMTP with an app password** (`smtp.gmail.com:465`, user = your Gmail, password = the 16-character app password from https://myaccount.google.com/apppasswords). It's free, needs no domain and reaches every recipient (~500/day). Resend below is the alternative once you own a domain.
+
 
 - 3,000 emails a month, **100 a day**.
 - Without a verified domain, Resend only delivers **from `onboarding@resend.dev` to the email address you signed up to Resend with**. Codes sent to other people fail (logged in Convex); borrowers can still open the code in the app with **Show pickup code**.

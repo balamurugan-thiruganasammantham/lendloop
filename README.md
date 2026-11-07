@@ -1,14 +1,65 @@
-# LendLoop
+# LendLoop — neighbourhood tool lending with automated workflows
 
-**Borrow what you need. Lend what you don't.**
+**Borrow what you need. Lend what you don't.** A take-home assignment for **Fluence International (Full-Stack Developer)**.
 
-LendLoop is a map-first, neighbourhood tool library. People list tools they rarely use; neighbours discover them on a map, request dates, meet to hand over with a one-time code, return the tool with a second code, and leave honest feedback. Every hand-over and status change is verified and authorised by the backend.
+**▶ Live app: https://lendloopapp.vercel.app** · n8n: https://looplend-n8n.onrender.com · Project document: [`docs/LendLoop-Project-Document.md`](docs/LendLoop-Project-Document.md) ([.docx](docs/LendLoop-Project-Document.docx))
 
-![Explore](docs/screenshots/explore-detail.png)
+`Next.js 16 (App Router)` · `React 19` · `TypeScript (strict)` · `Clerk` · `Convex` · `n8n (Docker)` · `Mapbox GL` · `SCSS modules` · `Vitest` · `Playwright` · `GitHub Actions → Vercel · Convex · Render`
 
-| Mobile explore | Borrow request | Profile & reputation |
+![Explore map with the category index, live location and distances](docs/screenshots/02-explore-map.png)
+
+## At a glance
+
+Neighbours list tools they rarely use; others find them on a map, request dates, hand over in person with a one-time code, return with a second code, and review each other. **Every rule is enforced in Convex, not the UI.** n8n delivers the notifications and the daily overdue reminders over **HMAC-signed, idempotent, retried** webhooks, and every delivery is visible on the loan itself.
+
+**Try it in 60 seconds** — sign in at https://lendloopapp.vercel.app/sign-in with a demo account and the verification code **`424242`** (Clerk test mode):
+
+| Role in the demo | Email | Code |
 | --- | --- | --- |
-| ![Mobile](docs/screenshots/explore-mobile.png) | ![Request](docs/screenshots/request-modal.png) | ![Profile](docs/screenshots/profile.png) |
+| Lender | `lendloop.owner+clerk_test@example.com` | `424242` |
+| Borrower | `lendloop.borrower+clerk_test@example.com` | `424242` |
+
+Use two browsers (or a private window): list a tool as the lender, request it as the borrower, approve, then read the pickup code from the borrower's screen into the lender's.
+
+### Assessment checklist
+
+| Requirement | Status | How / where |
+| --- | --- | --- |
+| Public page: LendLoop, tagline, tools from Convex, no owner details | ✅ | `src/components/landing/Landing.tsx`, `tools.publicPreview` (no owner fields; locations fuzzed ~500 m) |
+| "Sign in to lend or borrow" wired to Clerk | ✅ | Landing CTA → Clerk `<SignIn>` (sign-in-or-up) |
+| List a tool (name, category, condition, description) | ✅ | `src/features/listings/ToolForm.tsx` → `tools.create` (+ photos, pickup point, terms) |
+| Request a date range · approve / decline · mark returned | ✅ | `requests.create/approve/decline`; return confirmed with a one-time code (`otpActions.verifyCode`) |
+| All tools with availability, filterable by category | ✅ | Explore: map **and** list view, category index + chips, filters (`src/features/discovery`) |
+| My listings · My requests · Incoming requests | ✅ | `/listings`, `/requests`, `/incoming` |
+| Roles: admin (remove any listing, view all loans, Trusted Lender) · user (own listings, own requests) | ✅ | `convex/admin.ts` (`requireAdmin`), ownership + `loanRoleOf` checks in every function; no client path to ADMIN |
+| n8n workflow A: request notification on create / status change | ✅ | Convex outbox → signed webhook → `n8n/workflows/lendloop-request-notification.json` |
+| n8n workflow B: daily overdue reminders, write-back to Convex | ✅ | `lendloop-overdue-reminders.json` ↔ `/automation/overdue/candidates`, `/automation/reminders/*` |
+| HMAC both directions · secrets only in env / n8n credentials | ✅ | `convex/lib/crypto.ts`, `convex/http.ts`; workflow JSON contains no secrets |
+| Idempotent write-backs · retries · error workflow | ✅ | `eventId` / `reminderKey` dedup, nonce replay protection, backoff 30 s → 2 h → DEAD, `lendloop-error-handler.json` |
+| (Bonus) Automation activity on each loan | ✅ | Loan page "Automation" card (`loans.automationActivity`) |
+| README: setup, docker-compose, env vars, architecture, security & data minimisation, production note | ✅ | Sections [14](#14-local-development)–[16](#16-docker-compose-n8n), [3](#3-architecture), [9](#9-location-privacy), [19](#19-production-readiness) |
+
+### Highlights
+
+- **Privacy by design.** Other members only ever see a first name + last initial; no email, phone or address is shown to anyone. Everyone sees a **fuzzed (~500 m) location**; the **exact pickup point** lives in a separate table and is revealed **only to the approved borrower** of that loan.
+- **Authorisation in the backend.** Every Convex function re-derives the user from the Clerk JWT, checks ownership or loan participation (non-participants get `null`/`NOT_FOUND`, not "forbidden"), and role changes are server-only and audited.
+- **Verified hand-overs.** Pickup and return codes are HMAC-hashed with a pepper, expire, are single-use, attempt- and rate-limited, and only the owner can verify.
+- **Reliable automation.** Transactional outbox, signed webhooks with timestamp + nonce replay protection, claim/report idempotency, exponential retries, an error workflow, and per-loan delivery history.
+- **Tested end to end.** 139 unit + Convex integration tests; a Playwright run where two browsers complete the full lifecycle — run against the **live** site; CI on every push, CD to Vercel / Convex / Render with smoke tests.
+
+### Screenshots
+
+| Public landing (no owner details) | List view with inline filters |
+| --- | --- |
+| ![Landing](docs/screenshots/01-landing.png) | ![List view](docs/screenshots/03-explore-list.png) |
+| **Tool detail (approximate area only)** | **Borrow request** |
+| ![Tool detail](docs/screenshots/04-tool-detail.png) | ![Request](docs/screenshots/05-request-modal.png) |
+| **Incoming request (owner)** | **Loan: exact pickup point, code, automation activity** |
+| ![Incoming](docs/screenshots/06-incoming-request.png) | ![Loan](docs/screenshots/07-loan-borrower.png) |
+| **Owner verifies the hand-over code** | **Mobile** |
+| ![Owner loan](docs/screenshots/08-loan-owner.png) | ![Mobile](docs/screenshots/10-mobile-explore.png) |
+| **n8n · Request notification** | **n8n · Daily overdue reminders** |
+| ![n8n A](docs/screenshots/11-n8n-request-notification.png) | ![n8n B](docs/screenshots/12-n8n-overdue-reminders.png) |
 
 ## Live deployment
 
@@ -571,7 +622,7 @@ CAPTURE_SCREENSHOTS=1 npx playwright test tests/e2e/screenshots.spec.ts   # rege
 
 **Recommended before going live (not implemented)**
 - **Email:**
-  - Use a transactional provider (Postmark, SES, Resend) with SPF/DKIM/DMARC, bounce handling and per-user notification preferences.
+  - Use a transactional provider (Postmark, SES, Resend) on our own domain with SPF/DKIM/DMARC, bounce handling and per-user notification preferences (the demo sends through Gmail SMTP with an app password).
   - Consider SMS or push for hand-over codes.
 - **Maps:**
   - OpenFreeMap is free and keyless but has no SLA. For production, self-host the tiles (Planetiler + PMTiles) or use a provider with an SLA (MapTiler, Stadia, Protomaps).
